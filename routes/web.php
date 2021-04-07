@@ -1,7 +1,7 @@
 <?php
 
 
-Route::namespace('clodedisk')->prefix('/api/clodedisk')->group(function () {
+Route::prefix('/api/clodedisk')->group(function () {
 
   Route::get('/{fid}', 'DiskController@show');  // 获取文件，文件夹列表
   
@@ -15,3 +15,12 @@ Route::namespace('clodedisk')->prefix('/api/clodedisk')->group(function () {
   Route::Delete('/', 'DiskController@destroy'); // 删除文件或文件夹
 
 });
+
+// 后备路由
+Route::any('/{any}', function () {
+  return [
+    'status' => -1,
+    'msg' => 'api错误',
+    'data' => []
+  ];
+})->where('any', '.*');
