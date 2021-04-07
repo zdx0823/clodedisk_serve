@@ -21,7 +21,7 @@ class CreateUploadFolder extends Migration
             $table->integer('uid_type')->unsigned();
             $table->bigInteger('ctime')->unsigned();
             $table->bigInteger('mtime')->unsigned()->default(0);
-            $table->bigInteger('dtime')->unsigned()->default(0);
+            $table->bigInteger('dtime')->nullable();
         });
     }
 

@@ -20,7 +20,7 @@ class CreateUploadFile extends Migration
             $table->integer('fid')->unsigned();
             $table->bigInteger('ctime')->unsigned();
             $table->bigInteger('mtime')->unsigned()->default(0);
-            $table->bigInteger('dtime')->unsigned()->default(0);
+            $table->bigInteger('dtime')->nullable();
         });
     }
 

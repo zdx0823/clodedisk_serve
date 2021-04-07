@@ -5,13 +5,16 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class CheckParams
 {
 
     private $message = [
         'required' => '路由错误，缺少参数[:attribute]',
-        'numeric' => '路由错误，参数[:attribute]必须为数字类型'
+        'numeric' => '路由错误，参数[:attribute]必须为数字类型',
+        'min' => '路由错误，参数[:attribute]不能小于 :min',
+        'in' => '路由错误，参数[:attribute]类型必须是 :values'
     ];
 
     /**
@@ -43,13 +46,29 @@ class CheckParams
 
 
     private function show ($request) {
+        // 路由参数
         $res = Validator::make($request->route()->parameters, [
             'fid' => 'bail|required|numeric'
         ], $this->message);
 
-        if ($res->fails() === false) return true;
+        if ($res->fails() !== false) return $this->makeErrRes($res);
 
-        return $this->makeErrRes($res);
+        // query字段
+        $queryRes = Validator::make($request->query(), [
+            'page' => 'bail|numeric|min:1',
+            'pagesize' => 'bail|numeric|min:10',
+            'order' => [
+                Rule::in(['asc', 'desc', 'ASC', 'DESC'])
+            ]
+        ], $this->message);
+
+        if ($queryRes->fails() !== false) return $this->makeErrRes($queryRes);
+
+        $request->page = isset($request->page) ? $request->page : 1;
+        $request->pagesize = isset($request->pagesize) ? $request->pagesize : 10;
+        $request->order = isset($request->order) ? $request->order : 'desc';
+
+        return true;
     }
 
 

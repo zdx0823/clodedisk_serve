@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Carbon\Carbon;
 
 class UploadFile extends Model
 {
@@ -21,6 +22,21 @@ class UploadFile extends Model
     const UPDATED_AT = 'mtime';
     const DELETED_AT = 'dtime';
 
+    // 自定义字段
+    protected $appends = ['type'];
+
     // 使用数字时间戳
     protected $dateFormat = 'U';
+
+    public function getCtimeAttribute ($value) {
+        return Carbon::create($value)->toDateTimeString();
+    }
+
+    public function getMtimeAttribute ($value) {
+        return Carbon::create($value)->toDateTimeString();
+    }
+
+    public function getTypeAttribute () {
+        return 'file';
+    }
 }
