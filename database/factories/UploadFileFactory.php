@@ -21,9 +21,11 @@ class UploadFileFactory extends Factory
      */
     public function definition()
     {
+        $ext = ['txt','jpg','jpeg','png'];
+        $extVal = $ext[array_rand($ext)];
         return [
-            'name' => md5($this->faker->name) . '.txt',
-            'alias' => substr(md5($this->faker->name), 0, 8) . '.txt'
+            'name' => md5($this->faker->name) . '.' . $extVal,
+            'alias' => substr(md5($this->faker->name), 0, 8) . '.' . $extVal
         ];
     }
 }

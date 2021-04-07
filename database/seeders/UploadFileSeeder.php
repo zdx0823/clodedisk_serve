@@ -28,12 +28,27 @@ class UploadFileSeeder extends Seeder
         }, $fids);
 
         // 随机插入100条数据
-        UploadFile::factory()
+        $files = UploadFile::factory()
             ->times(100)
             ->state(new Sequence(...$fids))
             ->create([
                 UploadFile::CREATED_AT => time(),
                 UploadFile::UPDATED_AT => time()
             ]);
+
+        // 生成对应的file_extend数据
+        $fileExtendData = array_map(function ($item) {
+
+            $arr = explode('.', $item['alias']);
+            return [
+                'file_id' => $item['id'],
+                'ext' => array_pop($arr),
+                'size' => mt_rand(3145728, 20971520) // 3M 到 10M
+            ];
+            
+        }, $files->toArray());
+
+        // 插入file_extend数据
+        DB::table('upload_file_extend')->insert($fileExtendData);
     }
 }

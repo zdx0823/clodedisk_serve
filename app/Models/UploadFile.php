@@ -39,4 +39,12 @@ class UploadFile extends Model
     public function getTypeAttribute () {
         return 'file';
     }
+
+    public function folder () {
+        return $this->belongTo('App\Models\UploadFolder', 'fid');
+    }
+
+    public function extend_info () {
+        return $this->hasOne('App\Models\UploadFileExtend', 'file_id');
+    }
 }

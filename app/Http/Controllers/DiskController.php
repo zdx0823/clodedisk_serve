@@ -50,6 +50,24 @@ class DiskController extends Controller
     }
 
 
+    /**
+     * 生成图片路径，根据文件后缀，给文件项添加图片路径，前缀为env('RESOURCE_IMG_URL')
+     * @param array
+     * @return array  img_path 大图，img_path_sm 小图
+     */
+    protected function buildImgPath ($item) {
+        if ($item['type'] === 'folder') return $item;
+
+        $ext = $item['extend_info']['ext'];
+        if (!in_array($ext, ['jpg', 'jpeg', 'png'])) return $item;
+
+        $item['img_path'] = env('RESOURCE_IMG_URL') . '/' . $item['name'];
+        $item['img_path_sm'] = $item['img_path'] . '?w=300';
+
+        return $item;
+    }
+
+
     // 文件，文件夹列表
     public function show (Request $request) {
         $uid = 1;
@@ -81,6 +99,7 @@ class DiskController extends Controller
             
         // 拿出10个文件
         $files = UploadFile::select(['id', 'name', 'alias', 'fid', 'ctime'])
+            ->with('extend_info')
             ->where('fid', $fid)
             ->orderBy('ctime', $order)
             ->limit($limit)
@@ -110,7 +129,8 @@ class DiskController extends Controller
             $item['path'] = $item['type'] === 'folder'
                 ? $tPath . '/' . $item['name']
                 : $tPath . '/' . $item['alias'];
-            
+
+            $item = $this->buildImgPath($item);
             return $item;
         }, $data);
 
