@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\UploadFolder;
 use App\Models\UploadFile;
+use App\Clodedisk\Common\ClodediskCommon;
 
 class DiskController extends Controller
 {
@@ -26,6 +27,8 @@ class DiskController extends Controller
 
         $curFid = $fid;
         $data = [];
+
+        // 向上遍历直到用户的顶层文件夹
         do {
 
             $crumbOne = UploadFolder::select(['id', 'fid', 'name'])->where('id', $curFid)->first();
@@ -33,11 +36,16 @@ class DiskController extends Controller
             array_unshift($data, $crumbOne->toArray());
 
         } while ($curFid !== NULL);
-        
+
+        // 修改第一项的值
         $data[0]['fid'] = 0;
         $data[0]['name'] = '全部文件';
-
+    
+        // 合并成字符串，提出“全部文件”，最终路径形如： /文件夹/子文件夹/孙文件夹，/表示顶层目录
         $path = implode('/', array_column($data, 'name'));
+        $path = str_replace('全部文件', '', $path);
+
+        // 从后向前取出3条做面包屑
         $crumb = [];
         foreach ($data as $item) {
             if (count($crumb) === 3) {
@@ -68,15 +76,22 @@ class DiskController extends Controller
     }
 
 
-    // 文件，文件夹列表
-    public function show (Request $request) {
-        $uid = 1;
-        $uid_type = 3;
-        $fid = $request->fid;
-        $offset = ($request->page - 1) * $request->pagesize;
-        $limit = $request->pagesize;
-        $order = $request->order;
+    /**
+     * 根据fid查询该文件夹下的文件和文件夹
+     * @param array uid, uid_type 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
+     * @return array data数据，tPath当前路径，crumb数组，面包屑
+     */
+    protected function listByFid ($params) {
 
+        [
+            'uid' => $uid,
+            'uid_type' => $uid_type,
+            'fid' => $fid,
+            'offset' => $offset,
+            'limit' => $limit,
+            'order' => $order
+        ] = $params;
+        
         // 如果fid==0表示要获取用户顶层目录下的文件，取出该用户的顶层目录id
         if ($fid == 0) {
             $fid = UploadFolder::select(['id'])
@@ -85,6 +100,17 @@ class DiskController extends Controller
                 ->where('fid', null)
                 ->first()->id;
         }
+
+        // 检查id = fid 的文件夹存不存在
+        $isFidExist = UploadFolder::select(['id'])
+            ->where('id', $fid)
+            ->where('uid', $uid)
+            ->where('uid_type', $uid_type)
+            ->first();
+        if ($isFidExist == null) {
+            return false;
+        }
+
 
         // 拿出10个文件夹
         $folders = UploadFolder::select(['id', 'fid', 'name', 'ctime'])
@@ -134,10 +160,144 @@ class DiskController extends Controller
             return $item;
         }, $data);
 
+        // 如果$path为空字符串，表示当前再往上就是顶层目录，需给它赋值为 /
+        $tPath = $tPath === '' ? '/' : $tPath;
+
+        return compact('data', 'crumb', 'tPath', 'fid');
+    }
+
+
+    /**
+     * 查出路径对应的fid
+     * @param $baseId 用户顶层目录的id，$path 文件夹路径
+     * @return number 正确返回fid值，错误返回-1
+     */
+    protected function retrieveFidByPath ($baseId, $path) {
+
+        // 分解成数组，剔除空字符串项，把 \文件夹\子文件夹\孙文件夹 转成 ['文件夹', '子文件夹', '孙文件夹']
+        $arr = [];
+        $pathArr = explode('/', $path);
+        foreach ($pathArr as $item) {
+            if (mb_strlen($item) > 0) {
+                array_push($arr, $item);
+            }
+        }
+
+        // 第一次查询的fid即顶层目录的id
+        $preFid = $baseId;
+
+        // 路径是否正确
+        $isPathOk = true;
+
+        // 根据$arr依次比对数据库的记录
+        // 每次查询的id作为下一次查询的fid
+        for ($i = 0, $len = count($arr); $i < $len; $i++) {
+            $_name = $arr[$i];
+            $res = UploadFolder::select(['id'])
+                ->where('fid', $preFid)
+                ->where('name', $_name)
+                ->first();
+      
+            // 如果没有结果则表示路径错误，不用再继续
+            if ($res == null) {
+              $isPathOk = false;
+              break;
+            }
+      
+            // 取出id作为下一次的fid
+            $preFid = $res->toArray()['id'];
+        }
+
+        // 路径正确返回最后一次查到的id，路径错误返回-1
+        return $isPathOk ? $preFid : -1;
+    }
+
+
+    /**
+     * 根据路径查出对应文件夹下的文件和文件夹
+     * 先查出路径对应的fid，再调用listByFid查询
+     * 
+     * @param array uid, uid_type 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
+     * @return array data数据，tPath当前路径，crumb数组，面包屑
+     */
+    protected function listByPath ($params) {
+        
+        [
+            'uid' => $uid,
+            'uid_type' => $uid_type,
+            'path' => $path,
+            'offset' => $offset,
+            'limit' => $limit,
+            'order' => $order
+        ] = $params;
+
+        // 获取用户顶层目录id
+        $baseId = UploadFolder::select(['id'])
+            ->where('fid', null)
+            ->where('uid', $uid)
+            ->where('uid_type', $uid_type)
+            ->first()
+            ->value('id');
+
+        $fid = $this->retrieveFidByPath($baseId, $path);
+
+        // fid = -1 表示路径不对
+        if ($fid === -1) {
+            return false;
+        }
+
+        unset($params['path']);
+        $params['fid'] = $fid;
+        
+        return $this->listByFid($params);
+    }
+
+
+    // 文件，文件夹列表
+    public function list (Request $request) {
+
+        $uid = 1;
+        $uid_type = 3;
+        $fid = $request->fid;
+        $path = $request->path;
+        $offset = ($request->page - 1) * $request->pagesize;
+        $limit = $request->pagesize;
+        $order = $request->order;
+
+        // 合并成数组
+        $params = compact('uid', 'uid_type', 'offset', 'limit', 'order');
+
+        // 添加fid值或path值
+        // 如果两者都存在 或者 只存在path 使用listByPath
+        if (($path != null && $fid != null) || ($path != null && $fid == null)) {
+            $params['path'] = $path;
+            $resData = $this->listByPath($params);
+        } else {
+            // 否则使用listByFid
+            $params['fid'] = $fid;
+            $resData = $this->listByFid($params);
+        }
+
+
+        // 返回false表示文件夹不存在
+        if ($resData === false) {
+            return ClodediskCommon::makeErrRes('路由错误，所选文件夹不存在或已被删除');
+        }
+
+
+        // 结构结果
+        [
+            'data' => $data,
+            'crumb' => $crumb,
+            'tPath' => $tPath,
+            'fid' => $tFid
+        ] = $resData;
+
+        // 返回结果
         return $this->doRes([
             'data' => $data,
             'crumbData' => $crumb,
-            'fid' => $fid,
+            'fid' => $tFid,
             'path' => $tPath
         ], '获取成功');
     }

@@ -4,7 +4,7 @@ use App\Http\Controllers;
 Route::prefix('/api/clodedisk')->middleware(['checkParams'])->group(function () {
 
   // 获取文件，文件夹列表
-  Route::get('/{fid}', 'DiskController@show')->name('show');
+  Route::get('/list', 'DiskController@list')->name('list');
   
   // 新建文件夹
   Route::Post('/folder', 'DiskController@storeFolder')->name('storeFolder');
