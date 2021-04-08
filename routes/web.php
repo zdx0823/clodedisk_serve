@@ -12,14 +12,14 @@ Route::prefix('/api/clodedisk')->middleware(['checkParams'])->group(function () 
   Route::post('/upload', 'DiskController@upload')->name('upload');
   
   // 修改文件名
-  Route::Put('/file/name', 'DiskController@updateFileName')->name('updateFileName');
+  Route::put('/file/name', 'DiskController@updateFileName')->name('updateFileName');
   // 修改文件夹名
-  Route::Put('/folder/name', 'DiskController@updateFolderName')->name('updateFolderName');
+  Route::put('/folder/name', 'DiskController@updateFolderName')->name('updateFolderName');
   // 复制，剪切文件或文件夹
-  Route::Put('/resource/location', 'DiskController@changeResource')->name('changeResource');
+  Route::put('/resource/location', 'DiskController@changeResource')->name('changeResource');
   
   // 删除文件或文件夹
-  Route::Delete('/', 'DiskController@destroy')->name('destroy');
+  Route::delete('/', 'DiskController@destroy')->name('destroy');
 
 });
 

@@ -80,6 +80,23 @@ class CheckParams
         return true;
     }
 
+
+    // updateFileName接口
+    private function updateFileName ($request) {
+        $validateData = $request->json()->all();
+        $res = Validator::make($validateData, [
+            'id' => 'bail|required|numeric|exists:upload_file,id',
+            'fid' => 'bail|required|numeric',
+            'name' => ['bail', 'required', 'regex:/^[^\\\\\/\:\*\?\"\<\>\|]{1,}$/', 'min:1', 'max:16'],
+        ], [
+            'regex' => '文件名不能包含下列任何字符：\\/:*?"<>|'
+        ]);
+
+        if ($res->fails() !== false) return $this->makeErrRes($res);
+
+        return true;
+    }
+
     
     /**
      * 检索出路由名，路由名即此类的方法名，如果返回非true值就是参数错误

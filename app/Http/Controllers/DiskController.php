@@ -42,7 +42,13 @@ class DiskController extends Controller
     }
 
 
-    protected function doRes ($data = [], $msg = '操作成功') {
+    /**
+     * 格式化返回结果
+     * @param array $data 返回数据
+     * @param string $msg 消息提示
+     * @return array status = 1, msg, data
+     */
+    protected static function doRes ($data = [], $msg = '操作成功') {
         $status = 1;
         return compact('status', 'msg', 'data');
     }
@@ -321,7 +327,7 @@ class DiskController extends Controller
         ] = $resData;
 
         // 返回结果
-        return $this->doRes([
+        return self::doRes([
             'data' => $data,
             'crumbData' => $crumb,
             'fid' => $tFid,
@@ -357,7 +363,7 @@ class DiskController extends Controller
             'folderName',
         ));
 
-        return compact('insertId');
+        return self::doRes(compact('insertId'), '新建成功');
     }
 
     // 上传文件
@@ -367,7 +373,41 @@ class DiskController extends Controller
 
     // 修改文件名
     public function updateFileName (Request $request) {
-        return 'updateFileName';
+
+        $uid = 1;
+        $uid_type = 3;
+        [
+            'id' => $id,
+            'fid' => $fid,
+            'name' => $name,
+        ] = $request->json()->all();
+
+        // 文件名是否存在，同一父级下alias不允许重复
+        $isExist = UploadFile::select('id')
+            ->where('fid', $fid)
+            ->where('alias', $name)
+            ->first();
+
+        // 重复
+        if ($isExist && $isExist->id != $id) return ClodediskCommon::makeErrRes('文件名重复，请重新输入'); 
+
+        // 名称可用
+        
+        // 实例化一个模型
+        $file = UploadFile::find($id);
+        
+        // 取出原文件后缀名，拼成alias值
+        $explodedName = explode('.', $name);
+        $name = array_shift($explodedName);
+        $ext = $file->extend_info->ext;
+        $name = "$name.$ext";
+
+        // 更改
+        $file->alias = $name;
+        $file->save();
+
+        // 更改成功
+        return self::doRes([], '重命名成功');
     }
     
     // 修改文件夹名
