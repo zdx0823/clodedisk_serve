@@ -32,11 +32,12 @@ class CheckParams
     }
 
 
+    // list接口
     private function list ($request) {
 
         // query字段
-        $validateData = $request->query();
-        $queryRes = Validator::make($validateData, [
+        $validateData = $request->json()->all();
+        $res = Validator::make($validateData, [
             'fid' => 'bail|$without:path|numeric',
             'path' => 'bail|$without:fid|string',
             'page' => 'bail|numeric|min:1',
@@ -46,11 +47,35 @@ class CheckParams
             ]
         ]);
 
-        if ($queryRes->fails() !== false) return $this->makeErrRes($queryRes);
+        if ($res->fails() !== false) return $this->makeErrRes($res);
 
-        $request->page = isset($request->page) ? $request->page : 1;
-        $request->pagesize = isset($request->pagesize) ? $request->pagesize : 10;
-        $request->order = isset($request->order) ? $request->order : 'desc';
+        $fid = isset($validateData['fid']) ? $validateData['fid'] : null;
+        $path = isset($validateData['path']) ? $validateData['path'] : null;
+        $page = isset($validateData['page']) ? $validateData['page'] : 1;
+        $pagesize = isset($validateData['pagesize']) ? $validateData['pagesize'] : 10;
+        $order = isset($validateData['order']) ? $validateData['order'] : 'desc';
+
+        $request->json()->set('page', $page);
+        $request->json()->set('pagesize', $pagesize);
+        $request->json()->set('order', $order);
+        $request->json()->set('fid', $fid);
+        $request->json()->set('path', $path);
+
+        return true;
+    }
+
+
+    // storeFolder接口
+    private function storeFolder ($request) {
+        $validateData = $request->json()->all();
+        $res = Validator::make($validateData, [
+            'fid' => 'bail|required|numeric',
+            'folderName' => ['bail', 'required', 'regex:/^[^\\\\\/\:\*\?\"\<\>\|]{1,}$/', 'min:1', 'max:16']
+        ], [
+            'regex' => '文件名不能包含下列任何字符：\\/:*?"<>|'
+        ]);
+
+        if ($res->fails() !== false) return $this->makeErrRes($res);
 
         return true;
     }

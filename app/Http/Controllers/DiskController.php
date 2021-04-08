@@ -11,7 +11,38 @@ use App\Clodedisk\Common\ClodediskCommon;
 class DiskController extends Controller
 {
 
-    private function doRes ($data = [], $msg = '操作成功') {
+    public function __construct () {
+        $this->middleware(function ($request, $next) {
+            return $this->middlewareGetBaseId($request, $next);
+        });
+    }
+
+
+    // 获取用户的顶层目录id
+    // 如果fid==0表示要获取用户顶层目录下的文件，取出该用户的顶层目录id
+    protected function middlewareGetBaseId ($request, $next) {
+
+        $routeName = $request->route()->getName();
+        $list = ['list', 'storeFolder'];
+
+        // 路由不需要fid或fid不为0跳过
+        if (!in_array($routeName, $list)) return $next($request);
+        if ($request->fid != 0) return $next($request);
+
+        $uid = 1;
+        $uid_type = 3;
+        $fid = UploadFolder::select(['id'])
+                ->where('uid_type', $uid_type)
+                ->where('uid', $uid)
+                ->where('fid', null)
+                ->first()->id;
+
+        $request->json()->set('fid', $fid);
+        return $next($request);
+    }
+
+
+    protected function doRes ($data = [], $msg = '操作成功') {
         $status = 1;
         return compact('status', 'msg', 'data');
     }
@@ -92,14 +123,6 @@ class DiskController extends Controller
             'order' => $order
         ] = $params;
         
-        // 如果fid==0表示要获取用户顶层目录下的文件，取出该用户的顶层目录id
-        if ($fid == 0) {
-            $fid = UploadFolder::select(['id'])
-                ->where('uid_type', $uid_type)
-                ->where('uid', $uid)
-                ->where('fid', null)
-                ->first()->id;
-        }
 
         // 检查id = fid 的文件夹存不存在
         $isFidExist = UploadFolder::select(['id'])
@@ -258,11 +281,15 @@ class DiskController extends Controller
 
         $uid = 1;
         $uid_type = 3;
-        $fid = $request->fid;
-        $path = $request->path;
-        $offset = ($request->page - 1) * $request->pagesize;
-        $limit = $request->pagesize;
-        $order = $request->order;
+        [
+            'fid' => $fid,
+            'path' => $path,
+            'page' => $page,
+            'pagesize' => $pagesize,
+            'order' => $order
+        ] = $request->json()->all();
+        $offset = ($page - 1) * $pagesize;
+        $limit = $pagesize;
 
         // 合并成数组
         $params = compact('uid', 'uid_type', 'offset', 'limit', 'order');
@@ -304,7 +331,33 @@ class DiskController extends Controller
 
     // 新建文件夹
     public function storeFolder (Request $request) {
-        return 'storeFolder';
+        
+        $uid = 1;
+        $uid_type = 3;
+        [
+            'fid' => $fid,
+            'folderName' => $folderName
+        ] = $request->json()->all();
+        
+        
+        // 判断父级文件夹是否存在
+        $isFidExist = UploadFolder::select('id')
+            ->where('uid', $uid)
+            ->where('uid_type', $uid_type)
+            ->where('id', $fid)
+            ->first();
+        // var_dump($isFidExist);
+        if ($isFidExist == null) {
+            return ClodediskCommon::makeErrRes('所在文件夹不存在或已被删除，请重试');
+        }
+
+        // 插入
+        $insertId = diskController\StoreFolderController::save(compact(
+            'fid',
+            'folderName',
+        ));
+
+        return compact('insertId');
     }
 
     // 上传文件

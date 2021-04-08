@@ -7,9 +7,9 @@ Route::prefix('/api/clodedisk')->middleware(['checkParams'])->group(function () 
   Route::get('/list', 'DiskController@list')->name('list');
   
   // 新建文件夹
-  Route::Post('/folder', 'DiskController@storeFolder')->name('storeFolder');
+  Route::post('/folder', 'DiskController@storeFolder')->name('storeFolder');
   // 上传文件
-  Route::Post('/upload', 'DiskController@upload')->name('upload');
+  Route::post('/upload', 'DiskController@upload')->name('upload');
   
   // 修改文件名
   Route::Put('/file/name', 'DiskController@updateFileName')->name('updateFileName');

@@ -62,4 +62,23 @@ class ClodediskCommon {
 
   }
 
+
+  // 转义正则表达式的特殊字符
+  public static function escapePreg ($str) {
+
+    $str = str_replace('(', '\(', $str);
+    $str = str_replace(')', '\)', $str);
+
+    return $str;
+  }
+
+  // 转义数据库正则表达式的特殊字符
+  public static function escapeSQL ($str) {
+
+    $str = str_replace('(', '\\\\(', $str);
+    $str = str_replace(')', '\\\\)', $str);
+
+    return $str;
+  }
+
 }

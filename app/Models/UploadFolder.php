@@ -16,6 +16,7 @@ class UploadFolder extends Model
 
     protected $table = 'upload_folder';
 
+    protected $fillable = ['uid', 'uid_type', 'fid', 'name'];
 
     // 默认的时间名
     const CREATED_AT = 'ctime';
