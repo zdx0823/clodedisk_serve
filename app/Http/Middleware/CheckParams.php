@@ -114,6 +114,25 @@ class CheckParams
         return true;
     }
 
+
+    // 上传文件参数判断
+    private function upload ($request) {
+        return true;
+        $validateData = $request->input();
+        $res = Validator::make($validateData, [
+            'fid' => 'bail|required|numeric',
+            'qqpartindex' => 'bail|required|numeric',
+            'qqpartbyteoffset' => 'bail|required|numeric',
+            'qqchunksize' => 'bail|required|numeric',
+            'qqtotalparts' => 'bail|required|numeric',
+            'qqtotalfilesize' => 'bail|required|numeric',
+            'qqfilename' => 'bail|required|string',
+            'qquuid' => 'bail|required|string',
+            'qqfile' => 'bail|required|file',
+        ]);
+        return true;
+    }
+
     
     /**
      * 检索出路由名，路由名即此类的方法名，如果返回非true值就是参数错误

@@ -5,6 +5,10 @@ use Illuminate\Support\Facades\Validator;
 
 class ClodediskCommon {
 
+  /**
+   * 返回失败的结果，$realMsg提示语，默认为空；$msgArr提示语数组，$data数据。
+   * 返回一个数组，status = 1, fakeMsg是同一的假提示语
+   */
   public static function makeErrRes ($realMsg = '', $msgArr = [], $data = []) {
     return [
         'status' => -1,
@@ -15,6 +19,19 @@ class ClodediskCommon {
         'data' => $data
     ];
   }
+
+
+  /**
+   * 返回成功的结果，$data 数据，$msg 提示语，默认为'操作成功'。返回一个数组
+   * @param array 数据
+   * @param string 提示语，默认为'操作成功'
+   * 
+   * @return array
+   */
+  public static function makeSuccRes ($data = [], $msg = '操作成功') {
+    $status = 1;
+    return compact('status', 'msg', 'data');
+}
 
   
   /**
@@ -79,6 +96,12 @@ class ClodediskCommon {
     $str = str_replace(')', '\\\\)', $str);
 
     return $str;
+  }
+
+
+  // 根据系统分隔符合并路径，接收一个数组，返回一个路径
+  public static function mergePath ($arr) {
+    return implode(DIRECTORY_SEPARATOR, $arr);
   }
 
 }

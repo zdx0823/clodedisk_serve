@@ -28,6 +28,9 @@ class UploadFile extends Model
     // 使用数字时间戳
     protected $dateFormat = 'U';
 
+    // 允许批量插入
+    protected $fillable = ['fid', 'name', 'alias'];
+
     public function getCtimeAttribute ($value) {
         return Carbon::create($value)->toDateTimeString();
     }

@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Models\UploadFolder;
 use App\Models\UploadFile;
 use App\Clodedisk\Common\ClodediskCommon;
+use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class DiskController extends Controller
 {
@@ -41,17 +43,6 @@ class DiskController extends Controller
         return $next($request);
     }
 
-
-    /**
-     * 格式化返回结果
-     * @param array $data 返回数据
-     * @param string $msg 消息提示
-     * @return array status = 1, msg, data
-     */
-    protected static function doRes ($data = [], $msg = '操作成功') {
-        $status = 1;
-        return compact('status', 'msg', 'data');
-    }
 
     /**
      * 生成面包屑
@@ -327,7 +318,7 @@ class DiskController extends Controller
         ] = $resData;
 
         // 返回结果
-        return self::doRes([
+        return ClodediskCommon::makeSuccRes([
             'data' => $data,
             'crumbData' => $crumb,
             'fid' => $tFid,
@@ -367,12 +358,135 @@ class DiskController extends Controller
             'folderName',
         ));
 
-        return self::doRes(compact('insertId'), '新建成功');
+        return ClodediskCommon::makeSuccRes(compact('insertId'), '新建成功');
     }
+
+
+    /**
+     * 合并文件
+     * params需要storageTmp，tmpDir，qqfilename，qquuid
+     * 返回最终的文件名
+     */
+    private function uploadMerge ($params) {
+        
+        [
+            'storageTmp' => $storageTmp,
+            'tmpDir' => $tmpDir,
+            'qqfilename' => $qqfilename,
+            'qquuid' => $qquuid
+        ] = $params;
+
+        // 取出分片列表
+        $pathList = $storageTmp->files($tmpDir);
+        sort($pathList);
+
+        // 循环追加成一个文件
+        $filePath = $tmpDir . DIRECTORY_SEPARATOR . $qqfilename;
+        foreach ($pathList as $chunkPath) {
+            $storageTmp->append(
+                $filePath,
+                $storageTmp->get($chunkPath),
+                null
+            );
+        }
+
+        // 删除该分片
+        $storageTmp->delete($chunkPath);
+
+        // 生成个随机文件名，移动到 upload/files 目录
+        $explodeQQfilename = explode('.', $qqfilename);
+        $ext = count($explodeQQfilename) > 1 ? array_pop($explodeQQfilename) : '';
+        $fileName = md5($qquuid . $qqfilename . Carbon::now()) . '.' . $ext;
+        
+        Storage::move(
+            ClodediskCommon::mergePath(['upload', 'tmp', $tmpDir, $qqfilename]),
+            ClodediskCommon::mergePath(['upload', 'files', $fileName]),
+        );
+
+        // 删除临时文件夹
+        $storageTmp->deleteDirectory($tmpDir);
+
+        return $fileName;
+    }
+
+
+    /**
+     * 写入数据库
+     * params需要fid，finalName
+     * 返回插入的id
+     */
+    private function insertToDB ($params) {
+
+        [
+            'fid' => $fid,
+            'finalName' => $name
+        ] = $params;
+
+        $alias = substr($name, mb_strlen($name) - 16);
+
+        $file = UploadFile::create(compact('fid', 'name', 'alias'));
+        return $file->id;
+    }
+
 
     // 上传文件
     public function upload (Request $request) {
-        return 'upload';
+
+        [
+            'qqpartindex' => $qqpartindex,
+            'qqpartindex' => $qqpartindex,
+            'qqpartbyteoffset' => $qqpartbyteoffset,
+            'qqchunksize' => $qqchunksize,
+            'qqtotalparts' => $qqtotalparts,
+            'qqtotalfilesize' => $qqtotalfilesize,
+            'qqfilename' => $qqfilename,
+            'qquuid' => $qquuid,
+            'fid' => $fid,
+        ] = $request->input();
+
+        // 超过50M禁止上传
+        if ($qqtotalfilesize > env('UPLOAD_MAX_SIZE')) {
+            return ClodediskCommon::makeErrRes('超过50M的文件禁止上传');
+        }
+
+        // 获取文件生成磁盘实例
+        $qqfile = $request->file('qqfile');
+        $storageTmp = Storage::disk('uploadTmp');
+
+        // 创建临时文件夹
+        $tmpDir = $qquuid;
+        $dirList = $storageTmp->directories(DIRECTORY_SEPARATOR);
+        if (!in_array($tmpDir, $dirList)) {
+            $storageTmp->makeDirectory($tmpDir);
+        }
+        
+        // 把分片移入它的临时文件夹
+        $storageTmp->putFileAs(
+            $tmpDir,
+            $qqfile,
+            $qqpartindex
+        );
+
+        // 如果是最后一个分片执行合并动作
+        if ($qqpartindex == $qqtotalparts - 1) {
+            $finalName = $this->uploadMerge(compact(
+                'storageTmp',
+                'tmpDir',
+                'qqfilename',
+                'qquuid'
+            ));
+
+            $insertId = $this->insertToDB(compact('fid', 'finalName'));
+
+            return ClodediskCommon::makeSuccRes([
+                'success' => true,
+                'insertId' => $insertId
+            ], '上传成功');
+        }
+
+        return [
+            'success' => true
+        ];
     }
 
 
@@ -418,7 +532,7 @@ class DiskController extends Controller
         $file->save();
 
         // 更改成功
-        return self::doRes([], '重命名成功');
+        return ClodediskCommon::makeSuccRes([], '重命名成功');
     }
     
 
@@ -458,7 +572,7 @@ class DiskController extends Controller
         $folder->save();
 
         // 更改成功
-        return self::doRes([], '重命名成功');
+        return ClodediskCommon::makeSuccRes([], '重命名成功');
     }
     
     // 复制，剪切文件或文件夹

@@ -52,6 +52,16 @@ return [
             'endpoint' => env('AWS_ENDPOINT'),
         ],
 
+        'uploadTmp' => [
+            'driver' => 'local',
+            'root' => storage_path('app/upload/tmp'),
+        ],
+
+        'uploadFiles' => [
+            'driver' => 'local',
+            'root' => storage_path('app/upload/files'),
+        ],
+
     ],
 
     /*
