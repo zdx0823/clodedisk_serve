@@ -335,7 +335,11 @@ class DiskController extends Controller
         ], '获取成功');
     }
 
-    // 新建文件夹
+
+    /**
+     * 新建文件夹
+     * @param Object fid父级文件夹id，folderName文件夹名
+     */
     public function storeFolder (Request $request) {
         
         $uid = 1;
@@ -371,7 +375,11 @@ class DiskController extends Controller
         return 'upload';
     }
 
-    // 修改文件名
+
+    /**
+     * 修改文件名
+     * @param Object 期望接收 id修改的文件，fid所在父级文件夹，name新名称，name是带后缀的
+     */
     public function updateFileName (Request $request) {
 
         $uid = 1;
@@ -393,8 +401,11 @@ class DiskController extends Controller
 
         // 名称可用
         
-        // 实例化一个模型
-        $file = UploadFile::find($id);
+        // 实例化一个模型，限制两个条件，fid和id都相同时
+        $file = UploadFile::where('fid', $fid)->where('id', $id)->first();
+
+        // 文件不存在
+        if ($file == null) return ClodediskCommon::makeErrRes('修改失败，文件不存在或已被删除'); 
         
         // 取出原文件后缀名，拼成alias值
         $explodedName = explode('.', $name);
@@ -410,9 +421,44 @@ class DiskController extends Controller
         return self::doRes([], '重命名成功');
     }
     
-    // 修改文件夹名
+
+    /**
+     * 修改文件夹名
+     * @param Object 期望接收 id修改的文件，fid所在父级文件夹，name新名称
+     */
     public function updateFolderName (Request $request) {
-        return 'updateFolderName';
+        
+        $uid = 1;
+        $uid_type = 3;
+        [
+            'id' => $id,
+            'fid' => $fid,
+            'name' => $name,
+        ] = $request->json()->all();
+
+        // 文件名是否存在，同一父级下alias不允许重复
+        $isExist = UploadFolder::select('id')
+            ->where('fid', $fid)
+            ->where('name', $name)
+            ->first();
+
+        // 重复
+        if ($isExist && $isExist->id != $id) return ClodediskCommon::makeErrRes('文件名重复，请重新输入'); 
+
+        // 名称可用
+        
+        // 实例化一个模型，限制两个条件，fid和id都相同时
+        $folder = UploadFolder::where('fid', $fid)->where('id', $id)->first();
+
+        // 文件夹不存在
+        if ($folder == null) return ClodediskCommon::makeErrRes('修改失败，文件夹不存在或已被删除'); 
+
+        // 更改
+        $folder->name = $name;
+        $folder->save();
+
+        // 更改成功
+        return self::doRes([], '重命名成功');
     }
     
     // 复制，剪切文件或文件夹
