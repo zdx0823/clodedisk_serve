@@ -16,7 +16,8 @@ Route::prefix('/api/clodedisk')->middleware(['checkParams'])->group(function () 
   // 修改文件夹名
   Route::put('/folder/name', 'DiskController@updateFolderName')->name('updateFolderName');
   // 复制，剪切文件或文件夹
-  Route::put('/resource/location', 'DiskController@changeResource')->name('changeResource');
+  Route::put('/resource/copy', 'DiskController@changeResource')->name('changeResource');
+  Route::put('/resource/cut', 'DiskController@changeResource')->name('changeResource');
   
   // 删除文件或文件夹
   Route::delete('/', 'DiskController@destroy')->name('destroy');

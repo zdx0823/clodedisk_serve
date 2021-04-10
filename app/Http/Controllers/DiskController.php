@@ -577,7 +577,9 @@ class DiskController extends Controller
     
     // 复制，剪切文件或文件夹
     public function changeResource (Request $request) {
-        return 'changeResource';
+
+        diskController\PasetController::paset($request);
+        
     }
     
     // 删除文件或文件夹

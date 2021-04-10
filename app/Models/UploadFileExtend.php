@@ -12,6 +12,9 @@ class UploadFileExtend extends Model
     protected $table = 'upload_file_extend';
     public $timestamps = false;
 
+    // 允许批量插入
+    protected $fillable = ['size', 'ext', 'file_id'];
+
     public function file () {
         return $this->belongsTo('App\Models\UploadFile', 'file_id');
     }

@@ -117,7 +117,6 @@ class CheckParams
 
     // 上传文件参数判断
     private function upload ($request) {
-        return true;
         $validateData = $request->input();
         $res = Validator::make($validateData, [
             'fid' => 'bail|required|numeric',
@@ -130,6 +129,26 @@ class CheckParams
             'qquuid' => 'bail|required|string',
             'qqfile' => 'bail|required|file',
         ]);
+
+        if ($res->fails() !== false) return $this->makeErrRes($res);
+
+        return true;
+    }
+
+
+    // 复制文件或文件夹
+    private function changeResource ($request) {
+        $validateData = $request->json()->all();
+        $res = Validator::make($validateData, [
+            'idList' => 'bail|required|array',
+            'idList.*' => 'bail|required|array',
+            'idList.*.id' => 'bail|required|numeric',
+            'idList.*.type' => 'bail|required|in:file,folder',
+            'distId' => 'bail|required|numeric',
+        ]);
+
+        if ($res->fails() !== false) return $this->makeErrRes($res);
+
         return true;
     }
 

@@ -1,0 +1,533 @@
+<?php
+
+namespace App\Http\Controllers\diskController;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Models\UploadFolder;
+use App\Models\UploadFile;
+use App\Models\UploadFileExtend;
+use App\Clodedisk\Common\ClodediskCommon;
+
+class PasetController extends Controller
+{
+    
+    /**
+     * 判断要复制的文件和文件夹是否来自同一个父级
+     * $fileIdArr 文件id数组，$folderIdArr 文件夹id数组
+     * 返回布尔值
+     */
+    private static function isFromSameFid ($fileIdArr, $folderIdArr) {
+
+        // 判断文件
+        $fileFid = -1;
+        if (count($fileIdArr) > 0) {
+
+            // 查出这些文件的fid，取出fid数组
+            $fidList = UploadFile::select('fid')
+            ->whereIn('id', $fileIdArr)
+            ->pluck('fid')
+            ->toArray();
+
+            // 去重看有没有重复，长度大于1表示有重复，即有文件来自另一个文件夹下
+            if (count(array_unique($fidList)) > 1) {
+                return false;
+            }
+
+            if ($folderIdArr == null) return true;
+
+            $fileFid = $fidList[0];
+        }
+    
+
+        // 判断文件夹
+        $folderFid = -1;
+        if (count($folderIdArr) > 0) {
+
+            $fidList = UploadFolder::select('fid')
+                ->whereIn('id', $folderIdArr)
+                ->pluck('fid')
+                ->toArray();
+
+            // 去重看有没有重复，长度大于1表示有重复，即有文件来自另一个文件夹下
+            if (count(array_unique($fidList)) > 1) {
+                return false;
+            }
+
+            if ($fileIdArr == null) return true;
+
+            $folderFid = $fidList[0];
+        }
+    
+        
+        if ($fileFid !== $folderFid) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+
+    /**
+     * 取出所有后代文件夹
+     * $folderIdArr 文件夹id数组
+     * 返回二维数组，形如：[ ['id' => 5, 'fid' => 1, 'name' => '文件夹'] ]
+     */
+    private static function getOffspringFolder ($folderIdArr) {
+
+        $folderData = [];  // 汇总数组，存放自身和所有后代的文件夹数据
+
+        // 递归循环取出所有后代
+        $currentIdList = $folderIdArr;  // 当前循环的fid列表
+        do {
+            
+            $arr = UploadFolder::select(['id', 'fid', 'name'])
+                ->whereIn('fid', $currentIdList)
+                ->get()
+                ->toArray();
+
+            $currentIdList = array_column($arr, 'id');
+            $folderData = array_merge($folderData, $arr);
+
+        } while (count($currentIdList) > 0);
+
+        // 取出自身数据
+        $arr = UploadFolder::select(['id', 'fid', 'name'])
+            ->whereIn('id', $folderIdArr)
+            ->get()
+            ->toArray();
+
+        return [
+            'offspring' => $folderData,
+            'target' => $arr,
+            'all' => array_merge($folderData, $arr),
+        ];
+    }
+
+
+    // 把字符串分成两部分，例如："小明(1)"分成 "小明" 和 "(1)"，"小红(1)(2)" 分成 "小红(1)" 和 "(2)"
+    private static function explodeName ($name) {
+
+        $firstVal = null;
+        $lastVal = null;
+        
+        // 检索有没有(x)的后缀
+        preg_match('/(\(\d+\)){1}$/', $name, $p1);
+
+        if (count($p1) > 0) {
+            $lastVal = $p1[1];
+
+            // 取出(x)前面的值
+            $s = ClodediskCommon::escapePreg($lastVal);
+            preg_match("/^(.*)$s$/", $name, $p2);
+            $firstVal = $p2[1];
+
+        } else {
+            $firstVal = $name;
+        }
+
+        $firstVal = mb_strlen($firstVal) === 0 ? null : $firstVal;
+        $lastVal = mb_strlen($lastVal) === 0 ? null : $lastVal;
+        return compact('firstVal', 'lastVal');
+    }
+
+
+    /**
+     * 取出类似的数据，$params为 $model, $distId, $nameList, $nameField
+     * $model: 模型实例，$distId：目的地文件夹id，$nameList：要输入的名称列表，$nameFieldId要对比的字段
+     * 返回二维数组，形如：[ [id => 3, fid => 1, name => '文件夹'] ]
+     */
+    private static function getSimilarName ($params) {
+
+        [
+            'model' => $model,
+            'distId' => $distId,
+            'nameList' => $nameList,
+            'nameField' => $nameField,
+        ] = $params;
+
+        // 合成正则
+        $regexpArr = [];
+        foreach ($nameList as $name) {
+            
+            // 分割成两部分
+            [
+                'firstVal' => $firstVal,
+                'lastVal' => $lastVal,
+            ] = self::explodeName($name);
+
+            // 如果firstVal不存在，则用lastVal做正则条件
+            $firstVal = $firstVal == null ? $lastVal : $firstVal;
+            $firstVal = ClodediskCommon::escapeSQL($firstVal);
+
+            array_push(
+                $regexpArr,
+                "$nameField REGEXP '^$firstVal(\\\\([0-9]+\\\\)){0,1}$'"
+            );
+
+        }
+
+        // 合并成字符串
+        $regexp = implode(' OR ', $regexpArr);
+
+        // 查询
+        $similarNameList = $model->select(['id', 'fid', 'name'])
+            ->where('fid', $distId)
+            ->whereRaw("($regexp)")
+            ->get()
+            ->toArray();
+
+        return $similarNameList;
+    }
+
+
+    /**
+     * 给重名项递增一个数字，假设重复项为：['文件夹(1)', '文件夹(2)'] 修改后 ['文件夹(3)', '文件夹(4)']
+     * 
+     * 返回数组，bigNumMap和finalName，外部需要把bigNumMap重新赋值
+     */
+    protected static function buildUsableName ($params) {
+
+        [
+            'targetName' => $name,
+            'firstVal' => $firstVal,
+            'currentDistList' => $distNameList,
+            'bigNumMap' => $bigNumMap,
+            'escapedPreg' => $escapedPreg,
+        ] = $params;
+
+        // $name是否存在与$distNameList，如果不存在则可直接用
+        if (!in_array($name, $distNameList)) return [
+            'finalName' => $name,
+            'bigNumMap' => $bigNumMap,
+        ];
+
+        // 降序排序
+        rsort($distNameList);
+
+        // 取出第一项
+        $bigName = array_shift($distNameList);
+
+        // 取出$name的数字，没有默认0
+        preg_match("/$escapedPreg(\((\d+)\)){1}$/", $name, $p1);
+        $nameNum = count($p1) > 0 ? $p1[2] : 0;
+
+        // 取出$bigName的数字，没有默认1
+        preg_match("/$escapedPreg(\((\d+)\)){1}$/", $bigName, $p1);
+        $bigNameNum = count($p1) > 0 ? $p1[2] : 0;
+
+        // 如果为0赋值成1，如果不为0，递增1
+        $bigNameNum = $bigNameNum === 0 ? 1 : $bigNameNum + 1;
+
+        // 取较大的数字，返回
+        $bigNum = $bigNameNum > $nameNum ? $bigNameNum : $nameNum;
+
+        // 判断该类似名称的最大数字是否存在，存在需要再递增1
+        if (isset($bigNumMap[$firstVal])) {
+            $n = $bigNumMap[$firstVal] + 1;
+            $bigNumMap[$firstVal] = $n;
+
+            $bigNum = $n;
+        } else {
+            $bigNumMap[$firstVal] = $bigNum;
+        }
+
+        
+        $finalName = "$firstVal($bigNum)";
+        return compact('finalName', 'bigNumMap');
+    }
+
+
+    /**
+     * 看顶层几个文件夹名是否在目的地里重名，如果重名则修改
+     * $distId 目标文件夹id，$targetData要复制的文件夹
+     * 
+     * 返回修改后的$targetData
+     */
+    private static function deWeightFolderName ($distId, $targetData) {
+        
+        // 取出名字列
+        $targetList = array_column($targetData, 'name');
+
+        // 找出目的文件夹下名称与$targetList相似的部分
+        $similarData = self::getSimilarName([
+            'nameField' => 'name',
+            'model' => new UploadFolder,
+            'distId' => $distId,
+            'nameList' => $targetList,
+        ]);
+
+        
+        $similarNameList = array_column($similarData, 'name');  // 名字列
+        $bigNumMap = [];  // 键名为 finalVal，键值为 finalVal类似名称里最大的数字
+        $targetDataRes = [];  // 生成新的数组
+        foreach ($targetData as $targetItem) {
+            
+            $targetName = $targetItem['name'];
+            [
+                'firstVal' => $firstVal,
+                'lastVal' => $lastVal,
+            ] = self::explodeName($targetName);
+
+            // 取出不带小括号的部分，并正则化，如果没有firstVal则lastVal作为搜索参数
+            $firstVal = $firstVal == null ? $lastVal : $firstVal;
+            $escapedPreg = ClodediskCommon::escapePreg($firstVal);
+
+            // 取出与$firstVal类似的项
+            $currentDistList = [];
+            foreach ($similarNameList as $similarName) {
+
+                preg_match("/$escapedPreg(\((\d+)\)){0,1}$/", $similarName, $p1);
+                if (count($p1) > 0) {
+                    array_push($currentDistList, $similarName);
+                }
+
+            }
+            
+            // 生成一个可用的名字，修改targetItem
+            $buildRes = self::buildUsableName(compact(
+                'targetName',
+                'firstVal',
+                'currentDistList',
+                'bigNumMap',
+                'escapedPreg',
+            ));
+
+            $bigNumMap = $buildRes['bigNumMap'];
+            $finalName = $buildRes['finalName'];
+
+
+            $targetItem['name'] = $finalName;
+
+            array_push($targetDataRes, $targetItem);
+        }
+
+        return $targetDataRes;
+    }
+
+
+
+    /**
+     * 创建文件夹，并修正文件夹之间的关系，成功返回
+     */
+    private static function storeFolder ($finalArr, $distId, $uid, $uid_type) {
+
+        $insertIds = [];
+
+        // 按finalArr的顺序依次插入并记录id值
+        foreach ($finalArr as $target) {
+            $ins = UploadFolder::create([
+                'name' => $target['name'],
+                'uid' => $uid,
+                'uid_type' => $uid_type
+            ]);
+            array_push($insertIds, $ins->id);
+        }
+
+        // 拿源数据和新数据做个id匹配
+
+        $idMap = array_combine(
+            array_column($finalArr, 'id'),
+            $insertIds
+        );
+
+        // 取出源数据的fid列，并根据$idMap修改
+        // 如果fid不存在与$idMap表示它是第一层文件夹，它的fid是distId
+        $fidList = [];
+        foreach ($finalArr as $final) {
+            $fid = $final['fid'];
+            if (isset($idMap[$fid])) {
+                array_push($fidList, $idMap[$fid]);
+            } else {
+                array_push($fidList, $distId);
+            }
+        }
+
+        // 做个fid的map
+        $fidMap = array_combine(
+            $insertIds,
+            $fidList
+        );
+
+        // 更新fid值
+        foreach ($fidMap as $id => $fid) {
+            UploadFolder::where('id', $id)->update(['fid' => $fid]);
+        }
+
+        return $idMap;
+    }
+
+
+    /**
+     * 复制文件夹，返回第一层和所有后代的id
+     */
+    private static function pasetFolder ($params) {
+
+        [
+            'uid' => $uid,
+            'uid_type' => $uid_type,
+            'folderIdArr' => $folderIdArr,
+            'distId' => $distId,
+        ] = $params;
+
+        // 取出所有后代文件夹
+        $sourceData = self::getOffspringFolder($folderIdArr);
+        $allData = $sourceData['all'];
+        $targetData = $sourceData['target'];
+
+        // 取出所有id
+        $allIdList = array_column($allData, 'id');
+
+        // 看后代文件夹id是否与目标文件夹id重叠，有则表示父子关系错误，无法粘贴
+        if (in_array($distId, $allIdList)) {
+            return '复制失败，目标文件夹是源文件夹的子文件夹';
+        }
+
+        // 修正重复的名字，自动递增后缀数字
+        $targetDataRes = self::deWeightFolderName($distId, $targetData);
+
+        // 合并第一层数组和子代数组
+        $finalArr = array_merge($sourceData['offspring'], $targetDataRes);
+
+        // 创建文件夹
+        $idMap = self::storeFolder($finalArr, $distId, $uid, $uid_type);
+
+        // 复制所有后代文件
+        $pasetFileParams = compact('uid', 'uid_type', 'distId');
+        $pasetFileParams['allFid'] = array_column($allData, 'id');
+        $pasetFileParams['fidMap'] = $idMap;
+        self::pasetOffspringFile($pasetFileParams);
+
+    }
+
+
+    private static function pasetFilesByData ($filesIns, $fidMap) {
+
+        // 按顺序插入文件，保存id
+        $insertIds = [];
+        
+        $files = $filesIns->toArray();
+
+        foreach ($files as $item) {
+            $ins = UploadFile::create([
+                'fid' => $item['fid'],
+                'name' => $item['name'],
+                'alias' => $item['alias'],
+            ]);
+            array_push($insertIds, $ins->id);
+        }
+
+
+        // 更新fid值
+        foreach ($fidMap as $oriFid => $fid) {
+            UploadFile::whereIn('id', $insertIds)
+                ->where('fid', $oriFid)
+                ->update(['fid' => $fid]);
+        }
+
+        // 做个fileIdMap
+        $fileIdMap = array_combine(
+            array_column($files, 'id'),
+            $insertIds
+        );
+
+        // 插入拓展信息
+        $extendInsertIds = [];
+        foreach ($filesIns as $ins) {
+            $size = $ins->extend_info->size;
+            $ext = $ins->extend_info->ext;
+            $file_id = $ins->extend_info->file_id;
+            $file_id = $fileIdMap[$file_id];
+
+            $extendId = UploadFileExtend::create(compact('size', 'ext', 'file_id'))->id;
+            array_push($extendInsertIds, $extendId);
+        }
+
+    }
+
+
+    /**
+     * 
+     */
+    private static function pasetOffspringFile ($params) {
+
+        [
+            'uid' => $uid,
+            'uid_type' => $uid_type,
+            'allFid' => $allFid,
+            'distId' => $distId,
+            'fidMap' => $fidMap,
+        ] = $params;
+
+
+        // 找出所有后代文件
+        $offspringIns = UploadFile::select(['id', 'fid', 'name', 'alias'])
+            ->whereIn('fid', $allFid)
+            ->get();
+
+        self::pasetFilesByData($offspringIns, $fidMap);
+    }
+
+
+
+    // 返回字符串，或true，字符串表示false
+    public static function paset ($request) {
+
+        $uid = 1;
+        $uid_type = 3;
+        [
+            'idList' => $idList,
+            'distId' => $distId,
+        ] = $request->json()->all();
+
+        
+        // 把文件和文件夹分成两个数组
+        $fileIdArr = [];
+        $folderIdArr = [];
+        foreach ($idList as $item) {
+            $id = $item['id'];
+            $type = $item['type'];
+            if ($type == 'file') {
+                array_push($fileIdArr, $id);
+            } else {
+                array_push($folderIdArr, $id);
+            }
+        }
+
+        
+        // 判断idList是否为同一个文件夹下的文件，如果不是不允许复制
+        $isDataOk = self::isFromSameFid($fileIdArr, $folderIdArr);
+        if (!$isDataOk) return '数据不可用，请刷新后重试';
+
+        // 复制文件夹
+        if (count($folderIdArr) > 0) {
+
+            self::pasetFolder(compact(
+                'uid',
+                'uid_type',
+                'folderIdArr',
+                'distId',
+            ));
+
+        }
+
+        // 复制文件
+        if (count($fileIdArr) > 0) {
+            
+            // 查出数据
+            $fileData = UploadFile::select(['id', 'fid', 'name', 'alias'])
+                ->whereIn('id', $fileIdArr)
+                ->get();
+
+
+            $fidMap = [
+                $fileData->toArray()[0]['fid'],
+                $distId
+            ];
+
+            self::pasetFilesByData($fileData, $fidMap);
+        }
+
+    }
+
+}

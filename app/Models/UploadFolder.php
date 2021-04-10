@@ -44,4 +44,8 @@ class UploadFolder extends Model
     public function getTypeAttribute () {
         return 'folder';
     }
+
+    public function child () {
+        return $this->hasMany('App\Models\UploadFolder', 'fid', 'id');
+    }
 }
