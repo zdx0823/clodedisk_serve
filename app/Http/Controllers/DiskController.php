@@ -39,7 +39,7 @@ class DiskController extends Controller
                 ->where('fid', null)
                 ->first()->id;
 
-        $request->json()->set('fid', $fid);
+        $request->fid = $fid;
         return $next($request);
     }
 
@@ -56,29 +56,41 @@ class DiskController extends Controller
         $curFid = $fid;
         $data = [];
 
+        $pathList = [];
         // 向上遍历直到用户的顶层文件夹
         do {
 
-            $crumbOne = UploadFolder::select(['id', 'fid', 'name'])->where('id', $curFid)->first();
-            $curFid = $crumbOne->fid;
-            array_unshift($data, $crumbOne->toArray());
+            $crumbOne = UploadFolder::select(['id', 'fid', 'name'])
+                ->where('id', $curFid)
+                ->first()
+                ->toArray();
+
+            $curFid = $crumbOne['fid'];
+            array_unshift($data, $crumbOne);
 
         } while ($curFid !== NULL);
 
         // 修改第一项的值
         $data[0]['fid'] = 0;
         $data[0]['name'] = '全部文件';
+
+        $nameList = array_column($data, 'name');
+        $nameList[0] = '';
+
+        // 给面包屑添加path参数
+        for ($i = 0, $len = count($nameList); $i < $len; $i++) {
+            $curPath = $i === 0
+                ? '/'
+                : implode('/', array_slice($nameList, 0, $i + 1));
+            $data[$i]['path'] = $curPath;
+        }
     
-        // 合并成字符串，提出“全部文件”，最终路径形如： /文件夹/子文件夹/孙文件夹，/表示顶层目录
-        $path = implode('/', array_column($data, 'name'));
-        $path = str_replace('全部文件', '', $path);
+        $path = implode('/', $nameList);
 
         // 从后向前取出3条做面包屑
         $crumb = [];
         foreach ($data as $item) {
-            if (count($crumb) === 3) {
-                break;
-            }
+            if (count($crumb) === 3) break;
             array_unshift($crumb, array_pop($data));
         }
 
@@ -106,8 +118,9 @@ class DiskController extends Controller
 
     /**
      * 根据fid查询该文件夹下的文件和文件夹
-     * @param array uid, uid_type 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
-     * @return array data数据，tPath当前路径，crumb数组，面包屑
+     * $params uid, uid_type 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
+     * 
+     * 返回 data数据，tPath当前路径，crumb数组，面包屑
      */
     protected function listByFid ($params) {
 
@@ -237,8 +250,9 @@ class DiskController extends Controller
      * 根据路径查出对应文件夹下的文件和文件夹
      * 先查出路径对应的fid，再调用listByFid查询
      * 
-     * @param array uid, uid_type 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
-     * @return array data数据，tPath当前路径，crumb数组，面包屑
+     * $params uid, uid_type 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
+     * 
+     * 返回 data数据，tPath当前路径，crumb数组，面包屑
      */
     protected function listByPath ($params) {
         
@@ -278,13 +292,13 @@ class DiskController extends Controller
 
         $uid = 1;
         $uid_type = 3;
-        [
-            'fid' => $fid,
-            'path' => $path,
-            'page' => $page,
-            'pagesize' => $pagesize,
-            'order' => $order
-        ] = $request->json()->all();
+
+        $fid = $request->input('fid', null);
+        $path = $request->input('path', null);
+        $page = $request->input('page', 1);
+        $pagesize = $request->input('pagesize', 10);
+        $order = $request->input('order', 'desc');
+
         $offset = ($page - 1) * $pagesize;
         $limit = $pagesize;
 
@@ -338,8 +352,7 @@ class DiskController extends Controller
         [
             'fid' => $fid,
             'folderName' => $folderName
-        ] = $request->json()->all();
-        
+        ] = $request->input();
         
         // 判断父级文件夹是否存在
         $isFidExist = UploadFolder::select('id')
@@ -347,7 +360,7 @@ class DiskController extends Controller
             ->where('uid_type', $uid_type)
             ->where('id', $fid)
             ->first();
-        // var_dump($isFidExist);
+
         if ($isFidExist == null) {
             return ClodediskCommon::makeErrRes('所在文件夹不存在或已被删除，请重试');
         }
@@ -502,7 +515,7 @@ class DiskController extends Controller
             'id' => $id,
             'fid' => $fid,
             'name' => $name,
-        ] = $request->json()->all();
+        ] = $request->input();
 
         // 文件名是否存在，同一父级下alias不允许重复
         $isExist = UploadFile::select('id')
@@ -548,7 +561,7 @@ class DiskController extends Controller
             'id' => $id,
             'fid' => $fid,
             'name' => $name,
-        ] = $request->json()->all();
+        ] = $request->input();
 
         // 文件名是否存在，同一父级下alias不允许重复
         $isExist = UploadFolder::select('id')
@@ -575,11 +588,20 @@ class DiskController extends Controller
         return ClodediskCommon::makeSuccRes([], '重命名成功');
     }
     
-    // 复制，剪切文件或文件夹
+
+    /**
+     * 复制，剪切文件或文件夹
+     */
     public function changeResource (Request $request) {
 
-        diskController\PasetController::paset($request);
+        $res = diskController\PasetController::paset($request->input());
         
+        if ($res === true) {
+            return ClodediskCommon::makeSuccRes([], '复制成功');
+        } else {
+            return ClodediskCommon::makeErrRes($res);
+        }
+
     }
     
     // 删除文件或文件夹

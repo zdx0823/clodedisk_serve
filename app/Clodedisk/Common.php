@@ -7,7 +7,7 @@ class ClodediskCommon {
 
   /**
    * 返回失败的结果，$realMsg提示语，默认为空；$msgArr提示语数组，$data数据。
-   * 返回一个数组，status = 1, fakeMsg是同一的假提示语
+   * 返回一个数组，status = -1, fakeMsg是同一的假提示语
    */
   public static function makeErrRes ($realMsg = '', $msgArr = [], $data = []) {
     return [
@@ -85,6 +85,7 @@ class ClodediskCommon {
 
     $str = str_replace('(', '\(', $str);
     $str = str_replace(')', '\)', $str);
+    $str = str_replace('.', '\.', $str);
 
     return $str;
   }
@@ -94,6 +95,7 @@ class ClodediskCommon {
 
     $str = str_replace('(', '\\\\(', $str);
     $str = str_replace(')', '\\\\)', $str);
+    $str = str_replace('.', '\\\\.', $str);
 
     return $str;
   }
@@ -107,12 +109,32 @@ class ClodediskCommon {
 
     /**
      * 把字符串分成两部分，例如："小明(1)"分成 "小明" 和 "(1)"，"小红(1)(2)" 分成 "小红(1)" 和 "(2)"
-     * 返回一个数组，firstVal小括号前面部分，lastVal最后一个小括号
+     * $oriName 文件名；$isHasExt是否有后缀，布尔值，如果给为true，则将最后的 .xx 视作后缀
+     * 
+     * 返回一个数组，
+     *    firstVal小括号前面部分，
+     *    lastVal最后一个小括号，
+     *    ext后缀，ext默认为空字符串，ext是带.的后缀
      */
-    public static function explodeName ($name) {
+    public static function explodeName ($oriName, $isHasExt = false) {
 
       $firstVal = null;
       $lastVal = null;
+
+      $ext = '';
+      $name = $oriName;
+
+      if ($isHasExt) {
+        preg_match('/(\.[^\.]+){1}$/', $oriName, $p1);
+        if (count($p1) > 0) {
+          $ext = $p1[1];
+
+          $nameLen = mb_strlen($name);
+          $extLen = mb_strlen($ext);
+
+          $name = substr($name, 0, $nameLen - $extLen);
+        }
+      }
       
       // 检索有没有(x)的后缀
       preg_match('/(\(\d+\)){1}$/', $name, $p1);
@@ -131,7 +153,8 @@ class ClodediskCommon {
 
         $firstVal = mb_strlen($firstVal) === 0 ? null : $firstVal;
         $lastVal = mb_strlen($lastVal) === 0 ? null : $lastVal;
-        return compact('firstVal', 'lastVal');
+
+        return compact('firstVal', 'lastVal', 'ext');
     }
 
 
@@ -142,8 +165,8 @@ class ClodediskCommon {
     public static function getExtByName ($name) {
 
         $exploded = explode('.', $name);
-        if (count($exploded) === 0) {
-            return '';
+        if (count($exploded) === 1) {
+          return '';
         }
 
         return array_pop($exploded);

@@ -36,7 +36,7 @@ class CheckParams
     private function list ($request) {
 
         // query字段
-        $validateData = $request->json()->all();
+        $validateData = $request->input();
         $res = Validator::make($validateData, [
             'fid' => 'bail|$without:path|numeric',
             'path' => 'bail|$without:fid|string',
@@ -49,25 +49,14 @@ class CheckParams
 
         if ($res->fails() !== false) return $this->makeErrRes($res);
 
-        $fid = isset($validateData['fid']) ? $validateData['fid'] : null;
-        $path = isset($validateData['path']) ? $validateData['path'] : null;
-        $page = isset($validateData['page']) ? $validateData['page'] : 1;
-        $pagesize = isset($validateData['pagesize']) ? $validateData['pagesize'] : 10;
-        $order = isset($validateData['order']) ? $validateData['order'] : 'desc';
-
-        $request->json()->set('page', $page);
-        $request->json()->set('pagesize', $pagesize);
-        $request->json()->set('order', $order);
-        $request->json()->set('fid', $fid);
-        $request->json()->set('path', $path);
-
         return true;
     }
 
 
     // storeFolder接口
     private function storeFolder ($request) {
-        $validateData = $request->json()->all();
+
+        $validateData = $request->input();
         $res = Validator::make($validateData, [
             'fid' => 'bail|required|numeric',
             'folderName' => ['bail', 'required', 'regex:/^[^\\\\\/\:\*\?\"\<\>\|]{1,}$/', 'min:1', 'max:16']
@@ -83,7 +72,7 @@ class CheckParams
 
     // updateFileName接口
     private function updateFileName ($request) {
-        $validateData = $request->json()->all();
+        $validateData = $request->input();
         $res = Validator::make($validateData, [
             'id' => 'bail|required|numeric|exists:upload_file,id',
             'fid' => 'bail|required|numeric',
@@ -100,7 +89,7 @@ class CheckParams
 
     // updateFolderName
     private function updateFolderName ($request) {
-        $validateData = $request->json()->all();
+        $validateData = $request->input();
         $res = Validator::make($validateData, [
             'id' => 'bail|required|numeric|exists:upload_folder,id',
             'fid' => 'bail|required|numeric',
@@ -127,7 +116,6 @@ class CheckParams
             'qqtotalfilesize' => 'bail|required|numeric',
             'qqfilename' => 'bail|required|string',
             'qquuid' => 'bail|required|string',
-            'qqfile' => 'bail|required|file',
         ]);
 
         if ($res->fails() !== false) return $this->makeErrRes($res);
@@ -138,7 +126,7 @@ class CheckParams
 
     // 复制文件或文件夹
     private function changeResource ($request) {
-        $validateData = $request->json()->all();
+        $validateData = $request->input();
         $res = Validator::make($validateData, [
             'idList' => 'bail|required|array',
             'idList.*' => 'bail|required|array',
