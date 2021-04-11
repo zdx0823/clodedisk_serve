@@ -15,6 +15,7 @@ class PasetController extends Controller
     /**
      * 判断要复制的文件和文件夹是否来自同一个父级
      * $fileIdArr 文件id数组，$folderIdArr 文件夹id数组
+     * 
      * 返回布尔值
      */
     private static function isFromSameFid ($fileIdArr, $folderIdArr) {
@@ -34,6 +35,7 @@ class PasetController extends Controller
                 return false;
             }
 
+            // 没有文件夹不用判断，直接返回
             if ($folderIdArr == null) return true;
 
             $fileFid = $fidList[0];
@@ -54,6 +56,7 @@ class PasetController extends Controller
                 return false;
             }
 
+            // 没有文件不用判断，直接返回
             if ($fileIdArr == null) return true;
 
             $folderFid = $fidList[0];
@@ -71,7 +74,9 @@ class PasetController extends Controller
     /**
      * 取出所有后代文件夹
      * $folderIdArr 文件夹id数组
-     * 返回二维数组，形如：[ ['id' => 5, 'fid' => 1, 'name' => '文件夹'] ]
+     * 
+     * 返回3个数组，offspring只有后代，target第一层文件夹，all所有文件夹
+     * 每一个都是二维数组，形如：[ ['id' => 5, 'fid' => 1, 'name' => '文件夹'] ]
      */
     private static function getOffspringFolder ($folderIdArr) {
 
@@ -105,36 +110,10 @@ class PasetController extends Controller
     }
 
 
-    // 把字符串分成两部分，例如："小明(1)"分成 "小明" 和 "(1)"，"小红(1)(2)" 分成 "小红(1)" 和 "(2)"
-    private static function explodeName ($name) {
-
-        $firstVal = null;
-        $lastVal = null;
-        
-        // 检索有没有(x)的后缀
-        preg_match('/(\(\d+\)){1}$/', $name, $p1);
-
-        if (count($p1) > 0) {
-            $lastVal = $p1[1];
-
-            // 取出(x)前面的值
-            $s = ClodediskCommon::escapePreg($lastVal);
-            preg_match("/^(.*)$s$/", $name, $p2);
-            $firstVal = $p2[1];
-
-        } else {
-            $firstVal = $name;
-        }
-
-        $firstVal = mb_strlen($firstVal) === 0 ? null : $firstVal;
-        $lastVal = mb_strlen($lastVal) === 0 ? null : $lastVal;
-        return compact('firstVal', 'lastVal');
-    }
-
-
     /**
      * 取出类似的数据，$params为 $model, $distId, $nameList, $nameField
      * $model: 模型实例，$distId：目的地文件夹id，$nameList：要输入的名称列表，$nameFieldId要对比的字段
+     * 
      * 返回二维数组，形如：[ [id => 3, fid => 1, name => '文件夹'] ]
      */
     private static function getSimilarName ($params) {
@@ -146,6 +125,9 @@ class PasetController extends Controller
             'nameField' => $nameField,
         ] = $params;
 
+        // 后缀
+        $ext = isset($params['ext']) ? ('.' . $params['ext']) : '';
+
         // 合成正则
         $regexpArr = [];
         foreach ($nameList as $name) {
@@ -154,7 +136,7 @@ class PasetController extends Controller
             [
                 'firstVal' => $firstVal,
                 'lastVal' => $lastVal,
-            ] = self::explodeName($name);
+            ] = ClodediskCommon::explodeName($name);
 
             // 如果firstVal不存在，则用lastVal做正则条件
             $firstVal = $firstVal == null ? $lastVal : $firstVal;
@@ -162,7 +144,7 @@ class PasetController extends Controller
 
             array_push(
                 $regexpArr,
-                "$nameField REGEXP '^$firstVal(\\\\([0-9]+\\\\)){0,1}$'"
+                "$nameField REGEXP '^$firstVal(\\\\([0-9]+\\\\)){0,1}$ext$'"
             );
 
         }
@@ -182,7 +164,15 @@ class PasetController extends Controller
 
 
     /**
+     * 生成一个可用的名称
      * 给重名项递增一个数字，假设重复项为：['文件夹(1)', '文件夹(2)'] 修改后 ['文件夹(3)', '文件夹(4)']
+     * $params:
+     *      targetName: 原完整名称
+     *      firstVal: 不带小括号和后缀前面的部分
+     *      currentDistList: 要比对的列表
+     *      bigNumMap: firstVal对应最大后缀数字索引匹配，
+     *              形如：[ '文件夹' => 2, ]，表示已存在，文件夹，文件夹(1)和文件夹(2)，还有重名需使用 "文件夹(3)"
+     *      escapedPreg:  已经正则化的正则搜索字符串
      * 
      * 返回数组，bigNumMap和finalName，外部需要把bigNumMap重新赋值
      */
@@ -202,6 +192,10 @@ class PasetController extends Controller
             'bigNumMap' => $bigNumMap,
         ];
 
+        // 后缀
+        $ext = ClodediskCommon::getExtByName($name);
+        $ext = mb_strlen($ext) > 0 ? ('.' . $ext) : $ext;
+
         // 降序排序
         rsort($distNameList);
 
@@ -209,11 +203,11 @@ class PasetController extends Controller
         $bigName = array_shift($distNameList);
 
         // 取出$name的数字，没有默认0
-        preg_match("/$escapedPreg(\((\d+)\)){1}$/", $name, $p1);
+        preg_match("/$escapedPreg(\((\d+)\)){1}$ext$/", $name, $p1);
         $nameNum = count($p1) > 0 ? $p1[2] : 0;
 
         // 取出$bigName的数字，没有默认1
-        preg_match("/$escapedPreg(\((\d+)\)){1}$/", $bigName, $p1);
+        preg_match("/$escapedPreg(\((\d+)\)){1}$ext$/", $bigName, $p1);
         $bigNameNum = count($p1) > 0 ? $p1[2] : 0;
 
         // 如果为0赋值成1，如果不为0，递增1
@@ -233,7 +227,7 @@ class PasetController extends Controller
         }
 
         
-        $finalName = "$firstVal($bigNum)";
+        $finalName = "$firstVal($bigNum)$ext";
         return compact('finalName', 'bigNumMap');
     }
 
@@ -267,7 +261,7 @@ class PasetController extends Controller
             [
                 'firstVal' => $firstVal,
                 'lastVal' => $lastVal,
-            ] = self::explodeName($targetName);
+            ] = ClodediskCommon::explodeName($targetName);
 
             // 取出不带小括号的部分，并正则化，如果没有firstVal则lastVal作为搜索参数
             $firstVal = $firstVal == null ? $lastVal : $firstVal;
@@ -309,6 +303,11 @@ class PasetController extends Controller
 
     /**
      * 创建文件夹，并修正文件夹之间的关系，成功返回
+     * $finalArr 顶层文件夹去重名后的数组
+     * $distId 目的地文件夹id
+     * $uid,$uid_type 辨认用户身份
+     * 
+     * 返回文件夹id匹配数组，键名为原文件夹id，键值为新文件夹id。该数组即文件的fidMap
      */
     private static function storeFolder ($finalArr, $distId, $uid, $uid_type) {
 
@@ -360,6 +359,12 @@ class PasetController extends Controller
 
     /**
      * 复制文件夹，返回第一层和所有后代的id
+     * $params
+     *      uid, uid_type 辨认用户身份
+     *      folderIdArr 顶层文件夹id数组
+     *      distId  目的地文件夹id
+     * 
+     * 无返回值
      */
     private static function pasetFolder ($params) {
 
@@ -401,6 +406,13 @@ class PasetController extends Controller
     }
 
 
+    /**
+     * 复制文件，和复制拓展表对应的记录
+     * $filesIns  文件模型实例，是查询后的结果，即 UploadFile::xxx->xxx->get() 的返回结果
+     * $fidMap  fid匹配数组，键名是原fid，键值是新的fid，用于更新插入文件的fid
+     * 
+     * 无返回值
+     */
     private static function pasetFilesByData ($filesIns, $fidMap) {
 
         // 按顺序插入文件，保存id
@@ -447,7 +459,14 @@ class PasetController extends Controller
 
 
     /**
+     * 复制后代文件
+     * $params
+     *      uid, uid_type 辨认用户身份
+     *      allFid 所有的文件夹id，包括后代的
+     *      distId 目的地文件夹id
+     *      fidMap fid匹配数组
      * 
+     * 无返回值
      */
     private static function pasetOffspringFile ($params) {
 
@@ -470,7 +489,12 @@ class PasetController extends Controller
 
 
 
-    // 返回字符串，或true，字符串表示false
+    /**
+     * 复制文件和文件夹
+     * $request Request的实例，从$request->json()->all() 中获取数据使用
+     * 
+     * 执行成功返回true，失败由系统报错返回
+     */
     public static function paset ($request) {
 
         $uid = 1;

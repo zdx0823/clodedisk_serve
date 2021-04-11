@@ -104,4 +104,49 @@ class ClodediskCommon {
     return implode(DIRECTORY_SEPARATOR, $arr);
   }
 
+
+    /**
+     * 把字符串分成两部分，例如："小明(1)"分成 "小明" 和 "(1)"，"小红(1)(2)" 分成 "小红(1)" 和 "(2)"
+     * 返回一个数组，firstVal小括号前面部分，lastVal最后一个小括号
+     */
+    public static function explodeName ($name) {
+
+      $firstVal = null;
+      $lastVal = null;
+      
+      // 检索有没有(x)的后缀
+      preg_match('/(\(\d+\)){1}$/', $name, $p1);
+
+      if (count($p1) > 0) {
+            $lastVal = $p1[1];
+
+            // 取出(x)前面的值
+            $s = ClodediskCommon::escapePreg($lastVal);
+            preg_match("/^(.*)$s$/", $name, $p2);
+            $firstVal = $p2[1];
+
+        } else {
+            $firstVal = $name;
+        }
+
+        $firstVal = mb_strlen($firstVal) === 0 ? null : $firstVal;
+        $lastVal = mb_strlen($lastVal) === 0 ? null : $lastVal;
+        return compact('firstVal', 'lastVal');
+    }
+
+
+    /**
+     * 根据文件名取得后缀
+     * 返回不带点的后缀名
+     */
+    public static function getExtByName ($name) {
+
+        $exploded = explode('.', $name);
+        if (count($exploded) === 0) {
+            return '';
+        }
+
+        return array_pop($exploded);
+    }
+
 }
