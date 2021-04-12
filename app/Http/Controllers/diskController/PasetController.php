@@ -78,7 +78,7 @@ class PasetController extends Controller
      * 返回3个数组，offspring只有后代，target第一层文件夹，all所有文件夹
      * 每一个都是二维数组，形如：[ ['id' => 5, 'fid' => 1, 'name' => '文件夹'] ]
      */
-    private static function getOffspringFolder ($folderIdArr) {
+    public static function getOffspringFolder ($folderIdArr) {
 
         $folderData = [];  // 汇总数组，存放自身和所有后代的文件夹数据
 

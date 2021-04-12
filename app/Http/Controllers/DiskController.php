@@ -623,6 +623,52 @@ class DiskController extends Controller
 
     // 删除文件或文件夹
     public function destroy (Request $request) {
-        return 'destroy';
+        
+        [
+            'idList' => $idList
+        ] = $request->input();
+        
+        
+        // 把文件和文件夹分成两个数组
+        $fileIdArr = [];
+        $folderIdArr = [];
+        foreach ($idList as $item) {
+            $id = $item['id'];
+            $type = $item['type'];
+            if ($type == 'file') {
+                array_push($fileIdArr, $id);
+            } else {
+                array_push($folderIdArr, $id);
+            }
+        }
+
+
+        // 如果有文件夹
+        if (count($folderIdArr) > 0) {
+
+            // 找出所有后代文件夹
+            [
+                'all' => $allFolder
+            ] = diskController\PasetController::getOffspringFolder($folderIdArr);
+
+            // 取出id列
+            $allFolderId = array_column($allFolder, 'id');
+
+            // 删除文件夹
+            UploadFolder::destroy($allFolderId);
+
+            // 删除所有后代文件
+            UploadFile::whereIn('fid', $allFolderId)->delete();
+
+        }
+
+        // 如果有文件
+        if (count($fileIdArr) > 0) {
+
+            UploadFile::destroy($fileIdArr);
+
+        }
+
+        return ClodediskCommon::makeSuccRes([], '删除成功');
     }
 }

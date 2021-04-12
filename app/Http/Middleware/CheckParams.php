@@ -156,6 +156,21 @@ class CheckParams
         return true;
     }
 
+
+    private function destroy ($request) {
+        $validateData = $request->input();
+        $res = Validator::make($validateData, [
+            'idList' => 'bail|required|array',
+            'idList.*' => 'bail|required|array',
+            'idList.*.id' => 'bail|required|numeric',
+            'idList.*.type' => 'bail|required|in:file,folder',
+        ]);
+
+        if ($res->fails() !== false) return $this->makeErrRes($res);
+
+        return true;
+    }
+
     
     /**
      * 检索出路由名，路由名即此类的方法名，如果返回非true值就是参数错误
