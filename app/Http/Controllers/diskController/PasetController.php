@@ -606,10 +606,11 @@ class PasetController extends Controller
 
 
             $fidMap = [
-                $fileData->toArray()[0]['fid'],
+                $fileData->toArray()[0]['fid'] =>
                 $distId
             ];
 
+            // var_dump($fidMap);
             $deWeightData = self::deWeightNames([
                 'distId' => $distId,
                 'nameField' => 'alias',
