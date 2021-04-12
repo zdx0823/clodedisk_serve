@@ -8,6 +8,7 @@ use App\Models\UploadFolder;
 use App\Models\UploadFile;
 use App\Models\UploadFileExtend;
 use App\Clodedisk\Common\ClodediskCommon;
+use Illuminate\Support\Facades\DB;
 
 class PasetController extends Controller
 {
@@ -351,29 +352,53 @@ class PasetController extends Controller
 
 
     /**
-     * 创建文件夹，并修正文件夹之间的关系，成功返回
+     * 创建文件夹，并修正文件夹之间的关系。默认为删除状态
      * $finalArr 顶层文件夹去重名后的数组
      * $distId 目的地文件夹id
      * $uid,$uid_type 辨认用户身份
      * 
-     * 返回文件夹id匹配数组，键名为原文件夹id，键值为新文件夹id。该数组即文件的fidMap
+     * 返回false，或 id匹配数组，键名为原文件夹id，键值为新文件夹id。该数组即文件的fidMap
      */
     private static function storeFolder ($finalArr, $distId, $uid, $uid_type) {
 
         $insertIds = [];
 
-        // 按finalArr的顺序依次插入并记录id值
-        foreach ($finalArr as $target) {
-            $ins = UploadFolder::create([
-                'name' => $target['name'],
-                'uid' => $uid,
-                'uid_type' => $uid_type
-            ]);
-            array_push($insertIds, $ins->id);
+        // 按finalArr的顺序依次插入并记录id值，并置为删除状态
+        // 使用DB事务，如果执行失败回滚
+        DB::beginTransaction();
+
+        $isFail = false;
+        try {
+
+            $ctime = $mtime = $dtime = time();
+            foreach ($finalArr as $target) {
+
+                $insertId = DB::table('upload_folder')->insertGetId([
+                    'name' => $target['name'],
+                    'uid' => $uid,
+                    'uid_type' => $uid_type,
+                    'ctime' => $ctime,
+                    'mtime' => $mtime,
+                    'dtime' => $dtime,
+                ]);
+                array_push($insertIds, $insertId);
+
+            }
+
+        } catch (\Throwable $th) {
+            $isFail = true;
         }
 
+        // 插入失败提前返回
+        if ($isFail) {
+            DB::rollBack();
+            return false;
+        }
+        
+        // 提交事务
+        DB::commit();
+        
         // 拿源数据和新数据做个id匹配
-
         $idMap = array_combine(
             array_column($finalArr, 'id'),
             $insertIds
@@ -398,8 +423,9 @@ class PasetController extends Controller
         );
 
         // 更新fid值
+        $ins = DB::table('upload_folder');
         foreach ($fidMap as $id => $fid) {
-            UploadFolder::where('id', $id)->update(['fid' => $fid]);
+            $ins->where('id', $id)->update(['fid' => $fid]);
         }
 
         return $idMap;
@@ -413,7 +439,7 @@ class PasetController extends Controller
      *      folderIdArr 顶层文件夹id数组
      *      distId  目的地文件夹id
      * 
-     * 正确返回true，错误返回错误提示语
+     * 返回true，或错误提示语
      */
     private static function pasetFolder ($params) {
 
@@ -452,23 +478,44 @@ class PasetController extends Controller
         // 创建文件夹
         $idMap = self::storeFolder($finalArr, $distId, $uid, $uid_type);
 
+        // 执行失败，提前返回
+        if ($idMap === false) return '复制失败，请重试';
+        
+
+        // 找出所有后代文件
+        $offspringIns = UploadFile::select(['id', 'fid', 'name', 'alias'])
+            ->whereIn('fid', array_column($allData, 'id'))
+            ->get();
+
         // 复制所有后代文件
-        $pasetFileParams = compact('uid', 'uid_type', 'distId');
-        $pasetFileParams['allFid'] = array_column($allData, 'id');
-        $pasetFileParams['fidMap'] = $idMap;
-        self::pasetOffspringFile($pasetFileParams);
+        $isPaseFileOk = self::pasetFilesByData($offspringIns, $idMap);        
+
+        // 取出新插入文件夹的id
+        $newFolderId = array_values($idMap);
+
+        // 文件复制，失败将已插入的文件夹删除
+        if (!$isPaseFileOk) {
+            
+            DB::table('upload_folder')->whereIn('id', $newFolderId)->delete();
+            return '复制失败，请重试';
+
+        }
+
+
+        // 成功，将文件夹置为非删除状态
+        DB::table('upload_folder')->whereIn('id', $newFolderId)->update(['dtime' => null]);
 
         return true;
     }
 
 
     /**
-     * 复制文件，和复制拓展表对应的记录
+     * 复制文件，和复制拓展表对应的记录，默认为非删除状态
      * $filesIns  文件模型实例，是查询后的结果，即 UploadFile::xxx->xxx->get() 的返回结果
      * $fidMap  fid匹配数组，键名是原fid，键值是新的fid，用于更新插入文件的fid
      * $deWeightData  去重名化的数据，如果有，用这个来插入数据库
      * 
-     * 无返回值
+     * 返回布尔值，成功true，失败false
      */
     private static function pasetFilesByData ($filesIns, $fidMap, $deWeightData = null) {
 
@@ -479,41 +526,62 @@ class PasetController extends Controller
             ? $deWeightData
             : $filesIns->toArray();
 
+        // id做键名，其他做键值，键值是数组
+        $filesFlat = [];
         foreach ($files as $item) {
-            $ins = UploadFile::create([
-                'fid' => $item['fid'],
-                'name' => $item['name'],
-                'alias' => $item['alias'],
-            ]);
-            array_push($insertIds, $ins->id);
+            $filesFlat[$item['id']] = $item;
         }
 
+        $isCreateFileOk = true;
 
-        // 更新fid值
+        // 开启事务，执行失败回滚
+        DB::beginTransaction();
+
+        // 尝试插入文件，如果SQL异常则回滚
+        try {
+
+            foreach ($filesIns as $file) {
+                $fid = $file->fid;
+                $name = $file->name;
+                $alias = $file->alias;
+                $ext = $file->extend_info->ext;
+                $size = $file->extend_info->size;
+
+                $insertId = commonController::insertFileToDB(compact(
+                    'fid', 'name', 'alias', 'ext', 'size',
+                ), false);
+
+                if ($insertId == null) {
+                    $isCreateFileOk = false;
+                    break;
+                }
+
+                array_push($insertIds, $insertId);
+            }
+
+        } catch (\Throwable $th) {
+            $isCreateFileOk = false;
+        }
+
+        // 有一个插入失败则回滚
+        if (!$isCreateFileOk) {
+            DB::rollback();
+            return false;
+        }
+
+        // 插入成功，更新fid值和dtime
+        DB::commit();
         foreach ($fidMap as $oriFid => $fid) {
-            UploadFile::whereIn('id', $insertIds)
+            DB::table('upload_file')
+                ->whereIn('id', $insertIds)
                 ->where('fid', $oriFid)
-                ->update(['fid' => $fid]);
+                ->update([
+                    'fid' => $fid,
+                    'dtime' => null,
+                ]);
         }
 
-        // 做个fileIdMap
-        $fileIdMap = array_combine(
-            array_column($files, 'id'),
-            $insertIds
-        );
-
-        // 插入拓展信息
-        $extendInsertIds = [];
-        foreach ($filesIns as $ins) {
-            $size = $ins->extend_info->size;
-            $ext = $ins->extend_info->ext;
-            $file_id = $ins->extend_info->file_id;
-            $file_id = $fileIdMap[$file_id];
-
-            $extendId = UploadFileExtend::create(compact('size', 'ext', 'file_id'))->id;
-            array_push($extendInsertIds, $extendId);
-        }
-
+        return true;
     }
 
 
@@ -525,7 +593,7 @@ class PasetController extends Controller
      *      distId 目的地文件夹id
      *      fidMap fid匹配数组
      * 
-     * 无返回值
+     * 返回布尔值
      */
     private static function pasetOffspringFile ($params) {
 
@@ -543,7 +611,7 @@ class PasetController extends Controller
             ->whereIn('fid', $allFid)
             ->get();
 
-        self::pasetFilesByData($offspringIns, $fidMap);
+        return self::pasetFilesByData($offspringIns, $fidMap);
     }
 
 
@@ -619,7 +687,11 @@ class PasetController extends Controller
                 'type' => 'file',
             ]);
 
-            self::pasetFilesByData($fileData, $fidMap, $deWeightData);
+            $res = self::pasetFilesByData($fileData, $fidMap, $deWeightData);
+        
+            if ($res !== true) {
+                return '复制失败，请重试';
+            }
         }
 
         return true;

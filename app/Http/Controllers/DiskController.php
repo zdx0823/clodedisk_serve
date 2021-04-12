@@ -9,6 +9,7 @@ use App\Models\UploadFile;
 use App\Clodedisk\Common\ClodediskCommon;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class DiskController extends Controller
 {
@@ -489,12 +490,31 @@ class DiskController extends Controller
                 'qquuid'
             ));
 
-            $insertId = $this->insertToDB(compact('fid', 'finalName'));
+            // 生成alias
+            $alias = substr($finalName, mb_strlen($finalName) - 16);
 
-            return ClodediskCommon::makeSuccRes([
-                'success' => true,
-                'insertId' => $insertId
-            ], '上传成功');
+            // 插入数据库记录
+            $insertId = diskController\commonController::insertFileToDB([
+                'fid' => $fid,
+                'name' => $finalName,
+                'alias' => $alias,
+                'ext' => ClodediskCommon::getExtByName($qqfilename),
+                'size' => $qqtotalfilesize,
+            ], true);
+
+
+            if ($insertId == null) {
+
+                return ClodediskCommon::makeErrRes('上传失败，请重试');
+
+            } else {
+
+                return ClodediskCommon::makeSuccRes([
+                    'success' => true,
+                    'insertId' => $insertId
+                ], '上传成功');
+
+            }
         }
 
         return [
