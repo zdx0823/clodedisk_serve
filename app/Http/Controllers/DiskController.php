@@ -590,9 +590,9 @@ class DiskController extends Controller
     
 
     /**
-     * 复制，剪切文件或文件夹
+     * 复制文件或文件夹
      */
-    public function changeResource (Request $request) {
+    public function copyResource (Request $request) {
 
         $res = diskController\PasetController::paset($request->input());
         
@@ -604,6 +604,23 @@ class DiskController extends Controller
 
     }
     
+
+    /**
+     * 剪切文件或文件夹
+     */
+    public function cutResource (Request $request) {
+
+        $res = diskController\PasetController::pasetCut($request->input());
+        
+        if ($res === true) {
+            return ClodediskCommon::makeSuccRes([], '移动成功');
+        } else {
+            return ClodediskCommon::makeErrRes($res);
+        }
+
+    }
+
+
     // 删除文件或文件夹
     public function destroy (Request $request) {
         return 'destroy';

@@ -624,4 +624,165 @@ class PasetController extends Controller
         return true;
     }
 
+
+    /**
+     * 剪切文件夹
+     * $params
+     *      uid, uid_type 身份辨识
+     *      folderIdArr 文件夹id数组
+     *      distId  目的地文件夹id
+     * 
+     * 返回true或错误提示语，执行失败由系统报错
+     */
+    private static function pasetCutFolder ($params) {
+
+        [
+            'uid' => $uid,
+            'uid_type' => $uid_type,
+            'folderIdArr' => $folderIdArr,
+            'distId' => $distId,
+        ] = $params;
+
+
+        // 取出所有后代文件夹
+        $sourceData = self::getOffspringFolder($folderIdArr);
+        $allData = $sourceData['all'];
+        $targetData = $sourceData['target'];
+
+        // 取出所有id
+        $allIdList = array_column($allData, 'id');
+
+        // 看后代文件夹id是否与目标文件夹id重叠，有则表示父子关系错误，无法粘贴
+        if (in_array($distId, $allIdList)) {
+            return '移动失败，目标文件夹是源文件夹的子文件夹';
+        }
+
+        // 修正重复的名字，自动递增后缀数字
+        $targetDataRes = self::deWeightNames([
+            'distId' => $distId,
+            'nameField' => 'name',
+            'model' => new UploadFolder,
+            'targetData' => $targetData,
+            'type' => 'folder',
+        ]);
+
+        // 更新数据，修改fid和name值
+        $ins = new UploadFolder;
+        foreach ($targetDataRes as $target) {
+            [
+                'id' => $id,
+                'name' => $name,
+            ] = $target;
+            
+            $ins->where('id', $id)
+                ->update([
+                    'fid' => $distId,
+                    'name' => $name,
+                ]);
+        }
+        
+        return true;
+    }
+
+
+    /**
+     * 
+     */
+    private static function pasetCutFile ($params) {
+
+        [
+            'uid' => $uid,
+            'uid_type' => $uid_type,
+            'fileIdArr' => $fileIdArr,
+            'distId' => $distId,
+        ] = $params;
+
+
+
+    }
+
+
+    /**
+     * 剪切文件或文件夹
+     */
+    public static function pasetCut ($params) {
+
+        $uid = 1;
+        $uid_type = 3;
+        [
+            'idList' => $idList,
+            'distId' => $distId,
+        ] = $params;
+
+        
+        // 把文件和文件夹分成两个数组
+        $fileIdArr = [];
+        $folderIdArr = [];
+        foreach ($idList as $item) {
+            $id = $item['id'];
+            $type = $item['type'];
+            if ($type == 'file') {
+                array_push($fileIdArr, $id);
+            } else {
+                array_push($folderIdArr, $id);
+            }
+        }
+
+        
+        // 判断idList是否为同一个文件夹下的文件，如果不是不允许复制
+        $isDataOk = self::isFromSameFid($fileIdArr, $folderIdArr);
+        if (!$isDataOk) return '数据不可用，请刷新后重试';
+
+        // 剪切文件夹
+        if (count($folderIdArr) > 0) {
+
+            $res = self::pasetCutFolder(compact(
+                'uid',
+                'uid_type',
+                'folderIdArr',
+                'distId',
+            ));
+
+            if ($res !== true) return $res;
+
+        }
+
+        // 复制文件
+        if (count($fileIdArr) > 0) {
+            
+            // 查出数据
+            $fileData = UploadFile::select(['id', 'fid', 'name', 'alias'])
+                ->whereIn('id', $fileIdArr)
+                ->get();
+
+
+            // 生成去重化的名字数据
+            $deWeightData = self::deWeightNames([
+                'distId' => $distId,
+                'nameField' => 'alias',
+                'model' => new UploadFile,
+                'targetData' => $fileData->toArray(),
+                'type' => 'file',
+            ]);
+
+
+            // 修改fid和name
+            $ins = new UploadFile;
+            foreach ($deWeightData as $deWeight) {
+                [
+                    'id' => $id,
+                    'alias' => $alias,
+                ] = $deWeight;
+
+                $ins->where('id', $id)->update([
+                    'alias' => $alias,
+                    'fid' => $distId,
+                ]);
+            }
+
+        }
+
+        return true;
+    }
+
 }

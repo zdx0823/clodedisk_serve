@@ -125,7 +125,23 @@ class CheckParams
 
 
     // 复制文件或文件夹
-    private function changeResource ($request) {
+    private function copyResource ($request) {
+        $validateData = $request->input();
+        $res = Validator::make($validateData, [
+            'idList' => 'bail|required|array',
+            'idList.*' => 'bail|required|array',
+            'idList.*.id' => 'bail|required|numeric',
+            'idList.*.type' => 'bail|required|in:file,folder',
+            'distId' => 'bail|required|numeric',
+        ]);
+
+        if ($res->fails() !== false) return $this->makeErrRes($res);
+
+        return true;
+    }
+
+
+    private function cutResource ($request) {
         $validateData = $request->input();
         $res = Validator::make($validateData, [
             'idList' => 'bail|required|array',
