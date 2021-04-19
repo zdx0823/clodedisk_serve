@@ -1,17 +1,17 @@
 <?php
-namespace App\Clodedisk\Common;
+namespace App\Custom\Common;
 
 use Illuminate\Support\Facades\Validator;
 
-class ClodediskCommon {
+class CustomCommon {
 
   /**
    * 返回失败的结果，$realMsg提示语，默认为空；$msgArr提示语数组，$data数据。
    * 返回一个数组，status = -1, fakeMsg是同一的假提示语
    */
-  public static function makeErrRes ($realMsg = '', $msgArr = [], $data = []) {
+  public static function makeErrRes ($realMsg = '', $msgArr = [], $data = [], $status = -1) {
     return [
-        'status' => -1,
+        'status' => $status,
         'msg' => '参数错误，请重试',
         'fakeMsg' => '服务错误，请重试',
         'realMsg' => $realMsg,
@@ -170,6 +170,24 @@ class ClodediskCommon {
         }
 
         return array_pop($exploded);
+    }
+
+
+    /**
+     * 根据 env 的 CRYPT_KEY变量做key和向量值，进行解密
+     */
+    public static function decrypt ($encrypted) {
+        $key = $iv = substr(config('custom.crypt_key'), 0, 16);
+        return openssl_decrypt($encrypted, 'aes-128-cbc', $key, 0 , $iv);
+    }
+
+
+    /**
+     * 根据 env 的 CRYPT_KEY变量做key和向量值，进行加密
+     */
+    public static function encrypt ($str) {
+        $key = $iv = substr(config('custom.crypt_key'), 0, 16);
+        return openssl_encrypt($str, 'aes-128-cbc', $key, 0 , $iv);
     }
 
 }

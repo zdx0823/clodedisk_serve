@@ -5,7 +5,7 @@ namespace App\Http\Controllers\diskController;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\UploadFolder;
-use App\Clodedisk\Common\ClodediskCommon;
+use App\Custom\Common\CustomCommon;
 
 class StoreFolderController extends Controller
 {
@@ -24,7 +24,7 @@ class StoreFolderController extends Controller
             $lastVal = $p1[1];
 
             // 取出(x)前面的值
-            $s = ClodediskCommon::escapePreg($lastVal);
+            $s = CustomCommon::escapePreg($lastVal);
             preg_match("/^(.*)$s$/", $name, $p2);
             $firstVal = $p2[1];
 
@@ -50,7 +50,7 @@ class StoreFolderController extends Controller
         ] = $params;
 
         // 检索出形如 "小明"，"小明(1)"，"小明(2)" 的数据
-        $escapedFirstVal = ClodediskCommon::escapeSQL($firstVal);
+        $escapedFirstVal = CustomCommon::escapeSQL($firstVal);
         $distData = UploadFolder::select('name')
             ->where('uid', $uid)
             ->where('uid_type', $uid_type)

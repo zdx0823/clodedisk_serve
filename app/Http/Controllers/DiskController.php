@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\UploadFolder;
 use App\Models\UploadFile;
-use App\Clodedisk\Common\ClodediskCommon;
+use App\Custom\Common\CustomCommon;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -100,7 +100,7 @@ class DiskController extends Controller
 
 
     /**
-     * 生成图片路径，根据文件后缀，给文件项添加图片路径，前缀为env('RESOURCE_IMG_URL')
+     * 生成图片路径，根据文件后缀，给文件项添加图片路径，前缀为config('custom.resource_img_url')
      * @param array
      * @return array  img_path 大图，img_path_sm 小图
      */
@@ -110,7 +110,7 @@ class DiskController extends Controller
         $ext = $item['extend_info']['ext'];
         if (!in_array($ext, ['jpg', 'jpeg', 'png'])) return $item;
 
-        $item['img_path'] = env('RESOURCE_IMG_URL') . '/' . $item['name'];
+        $item['img_path'] = config('custom.resource_img_url') . '/' . $item['name'];
         $item['img_path_sm'] = $item['img_path'] . '?w=300';
 
         return $item;
@@ -320,7 +320,7 @@ class DiskController extends Controller
 
         // 返回false表示文件夹不存在
         if ($resData === false) {
-            return ClodediskCommon::makeErrRes('路由错误，所选文件夹不存在或已被删除');
+            return CustomCommon::makeErrRes('路由错误，所选文件夹不存在或已被删除');
         }
 
 
@@ -333,7 +333,7 @@ class DiskController extends Controller
         ] = $resData;
 
         // 返回结果
-        return ClodediskCommon::makeSuccRes([
+        return CustomCommon::makeSuccRes([
             'data' => $data,
             'crumbData' => $crumb,
             'fid' => $tFid,
@@ -363,7 +363,7 @@ class DiskController extends Controller
             ->first();
 
         if ($isFidExist == null) {
-            return ClodediskCommon::makeErrRes('所在文件夹不存在或已被删除，请重试');
+            return CustomCommon::makeErrRes('所在文件夹不存在或已被删除，请重试');
         }
 
         // 插入
@@ -372,7 +372,7 @@ class DiskController extends Controller
             'folderName',
         ));
 
-        return ClodediskCommon::makeSuccRes(compact('insertId'), '新建成功');
+        return CustomCommon::makeSuccRes(compact('insertId'), '新建成功');
     }
 
 
@@ -413,8 +413,8 @@ class DiskController extends Controller
         $fileName = md5($qquuid . $qqfilename . Carbon::now()) . '.' . $ext;
         
         Storage::move(
-            ClodediskCommon::mergePath(['upload', 'tmp', $tmpDir, $qqfilename]),
-            ClodediskCommon::mergePath(['upload', 'files', $fileName]),
+            CustomCommon::mergePath(['upload', 'tmp', $tmpDir, $qqfilename]),
+            CustomCommon::mergePath(['upload', 'files', $fileName]),
         );
 
         // 删除临时文件夹
@@ -459,8 +459,8 @@ class DiskController extends Controller
         ] = $request->input();
 
         // 超过50M禁止上传
-        if ($qqtotalfilesize > env('UPLOAD_MAX_SIZE')) {
-            return ClodediskCommon::makeErrRes('超过50M的文件禁止上传');
+        if ($qqtotalfilesize > config('custom.upload_max_size')) {
+            return CustomCommon::makeErrRes('超过50M的文件禁止上传');
         }
 
         // 获取文件生成磁盘实例
@@ -498,18 +498,18 @@ class DiskController extends Controller
                 'fid' => $fid,
                 'name' => $finalName,
                 'alias' => $alias,
-                'ext' => ClodediskCommon::getExtByName($qqfilename),
+                'ext' => CustomCommon::getExtByName($qqfilename),
                 'size' => $qqtotalfilesize,
             ], true);
 
 
             if ($insertId == null) {
 
-                return ClodediskCommon::makeErrRes('上传失败，请重试');
+                return CustomCommon::makeErrRes('上传失败，请重试');
 
             } else {
 
-                return ClodediskCommon::makeSuccRes([
+                return CustomCommon::makeSuccRes([
                     'success' => true,
                     'insertId' => $insertId
                 ], '上传成功');
@@ -544,7 +544,7 @@ class DiskController extends Controller
             ->first();
 
         // 重复
-        if ($isExist && $isExist->id != $id) return ClodediskCommon::makeErrRes('文件名重复，请重新输入'); 
+        if ($isExist && $isExist->id != $id) return CustomCommon::makeErrRes('文件名重复，请重新输入'); 
 
         // 名称可用
         
@@ -552,7 +552,7 @@ class DiskController extends Controller
         $file = UploadFile::where('fid', $fid)->where('id', $id)->first();
 
         // 文件不存在
-        if ($file == null) return ClodediskCommon::makeErrRes('修改失败，文件不存在或已被删除'); 
+        if ($file == null) return CustomCommon::makeErrRes('修改失败，文件不存在或已被删除'); 
         
         // 取出原文件后缀名，拼成alias值
         $explodedName = explode('.', $name);
@@ -565,7 +565,7 @@ class DiskController extends Controller
         $file->save();
 
         // 更改成功
-        return ClodediskCommon::makeSuccRes([], '重命名成功');
+        return CustomCommon::makeSuccRes([], '重命名成功');
     }
     
 
@@ -590,7 +590,7 @@ class DiskController extends Controller
             ->first();
 
         // 重复
-        if ($isExist && $isExist->id != $id) return ClodediskCommon::makeErrRes('文件名重复，请重新输入'); 
+        if ($isExist && $isExist->id != $id) return CustomCommon::makeErrRes('文件名重复，请重新输入'); 
 
         // 名称可用
         
@@ -598,14 +598,14 @@ class DiskController extends Controller
         $folder = UploadFolder::where('fid', $fid)->where('id', $id)->first();
 
         // 文件夹不存在
-        if ($folder == null) return ClodediskCommon::makeErrRes('修改失败，文件夹不存在或已被删除'); 
+        if ($folder == null) return CustomCommon::makeErrRes('修改失败，文件夹不存在或已被删除'); 
 
         // 更改
         $folder->name = $name;
         $folder->save();
 
         // 更改成功
-        return ClodediskCommon::makeSuccRes([], '重命名成功');
+        return CustomCommon::makeSuccRes([], '重命名成功');
     }
     
 
@@ -617,9 +617,9 @@ class DiskController extends Controller
         $res = diskController\PasetController::paset($request->input());
         
         if ($res === true) {
-            return ClodediskCommon::makeSuccRes([], '复制成功');
+            return CustomCommon::makeSuccRes([], '复制成功');
         } else {
-            return ClodediskCommon::makeErrRes($res);
+            return CustomCommon::makeErrRes($res);
         }
 
     }
@@ -633,9 +633,9 @@ class DiskController extends Controller
         $res = diskController\PasetController::pasetCut($request->input());
         
         if ($res === true) {
-            return ClodediskCommon::makeSuccRes([], '移动成功');
+            return CustomCommon::makeSuccRes([], '移动成功');
         } else {
-            return ClodediskCommon::makeErrRes($res);
+            return CustomCommon::makeErrRes($res);
         }
 
     }
@@ -689,6 +689,6 @@ class DiskController extends Controller
 
         }
 
-        return ClodediskCommon::makeSuccRes([], '删除成功');
+        return CustomCommon::makeSuccRes([], '删除成功');
     }
 }

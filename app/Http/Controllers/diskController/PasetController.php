@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\UploadFolder;
 use App\Models\UploadFile;
 use App\Models\UploadFileExtend;
-use App\Clodedisk\Common\ClodediskCommon;
+use App\Custom\Common\CustomCommon;
 use Illuminate\Support\Facades\DB;
 
 class PasetController extends Controller
@@ -145,11 +145,11 @@ class PasetController extends Controller
                 'firstVal' => $firstVal,
                 'lastVal' => $lastVal,
                 'ext' => $ext,
-            ] = ClodediskCommon::explodeName($name, $isFile);
+            ] = CustomCommon::explodeName($name, $isFile);
 
             // 如果firstVal不存在，则用lastVal做正则条件
             $firstVal = $firstVal == null ? $lastVal : $firstVal;
-            $firstVal = ClodediskCommon::escapeSQL($firstVal);
+            $firstVal = CustomCommon::escapeSQL($firstVal);
 
             array_push(
                 $regexpArr,
@@ -188,7 +188,7 @@ class PasetController extends Controller
      *      type: 名称类型，file或folder
      * 
      * 此方法依赖于：
-     *      ClodediskCommon::getExtByName
+     *      CustomCommon::getExtByName
      * 
      * 返回数组，bigNumMap和finalName，外部需要把bigNumMap重新赋值
      */
@@ -213,7 +213,7 @@ class PasetController extends Controller
 
         // 如果type是文件，则取出后缀
         if ($type === 'file') {
-            $ext = ClodediskCommon::getExtByName($name);
+            $ext = CustomCommon::getExtByName($name);
             $ext = mb_strlen($ext) > 0 ? ('.' . $ext) : $ext;
         }
 
@@ -271,8 +271,8 @@ class PasetController extends Controller
      * 
      * 此方法依赖于：
      *      self::getSimilarName
-     *      ClodediskCommon::explodeName
-     *      ClodediskCommon::escapePreg
+     *      CustomCommon::explodeName
+     *      CustomCommon::escapePreg
      *      self::buildUsableName
      * 
      * 返回修改后的$targetData
@@ -310,11 +310,11 @@ class PasetController extends Controller
                 'firstVal' => $firstVal,
                 'lastVal' => $lastVal,
                 'ext' => $ext,
-            ] = ClodediskCommon::explodeName($targetName, $type);
+            ] = CustomCommon::explodeName($targetName, $type);
 
             // 取出不带小括号的部分，并正则化，如果没有firstVal则lastVal作为搜索参数
             $firstVal = $firstVal == null ? $lastVal : $firstVal;
-            $escapedPreg = ClodediskCommon::escapePreg($firstVal);
+            $escapedPreg = CustomCommon::escapePreg($firstVal);
 
             // 取出与$firstVal类似的项
             $currentDistList = [];

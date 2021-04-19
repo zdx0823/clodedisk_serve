@@ -4,7 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
-use App\Clodedisk\Common\ClodediskCommon;
+use App\Custom\Common\CustomCommon;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,6 +28,6 @@ class AppServiceProvider extends ServiceProvider
         Schema::defaultStringLength(191);
 
         // 注册一个自定义验证规则
-        ClodediskCommon::validateWithOut();
+        CustomCommon::validateWithOut();
     }
 }

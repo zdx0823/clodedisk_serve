@@ -28,7 +28,7 @@
             "Database\\Seeders\\": "database/seeders/"
         },
         "classmap": [
-            "app/clodedisk"
+            "app/custom"
         ]
     },
     "autoload-dev": {
