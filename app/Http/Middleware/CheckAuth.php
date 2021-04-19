@@ -94,6 +94,8 @@ class CheckAuth
         $routeName = $request->route()->getName();
 
         $SSO_URL = config('custom.sso_url');
+        $curUrl = $request->url();
+        $SSO_URL = "$SSO_URL?serve=$curUrl";
 
         // json返回值
         $jsonRes = CustomCommon::makeErrRes(
