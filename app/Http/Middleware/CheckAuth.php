@@ -93,7 +93,7 @@ class CheckAuth
         // 判断需要返回视图还是json数据
         $routeName = $request->route()->getName();
 
-        $SSO_URL = config('custom.sso_url');
+        $SSO_URL = config('custom.sso.login');
         $curUrl = $request->url();
         $SSO_URL = "$SSO_URL?serve=$curUrl";
 
