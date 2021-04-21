@@ -54,7 +54,7 @@ class AuthApi {
 
         // 发送请求
         $url = config('custom.sso.user_info');
-        $data = CustomCommon::client('POST', $url, [
+        $data = CustomCommon::client('GET', $url, [
             'form_params' => compact('tgc')
         ]);
 

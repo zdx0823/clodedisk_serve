@@ -26,9 +26,10 @@ class CheckSt {
 
         $url = config('custom.sso.check_st');
         $session_id = Session::getId();
+        $logout_api = route('ssoLogout');
 
         $data = Customcommon::client('POST', $url, [
-            'form_params' => compact('st', 'session_id')
+            'form_params' => compact('st', 'session_id', 'logout_api')
         ]);
 
         if ($data['status'] === -1) return false;

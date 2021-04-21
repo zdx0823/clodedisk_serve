@@ -183,6 +183,9 @@ class CheckParams
     public function handle(Request $request, Closure $next)
     {
         $routeName = $request->route()->getName();
+
+        if (!isset($this->$routeName)) return $next($request);
+
         $res = $this->$routeName($request);
         if ($res !== true) {
             return response()->json($res);

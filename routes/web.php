@@ -28,6 +28,11 @@ Route::prefix('/api/clodedisk')->middleware(['authApi', 'checkParams'])->group(f
 // 静态页面
 Route::get('/', 'StaticPageController@index')->middleware('authPage')->name('indexPage');
 
+// 登出
+Route::post('/api/clodedisk/logout', 'SessionController@logout')->name('logout');
+
+// SSO登出
+Route::post('/api/clodedisk/logout/sso', 'SessionController@ssoLogout')->name('ssoLogout');
 
 // 后备路由
 Route::any('/{any}', function () {

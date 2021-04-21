@@ -14,6 +14,7 @@ class VerifyCsrfToken extends Middleware
     protected $except = [
         'api/clodedisk',
         'api/clodedisk/*',
+        'api/clodedisk/logout/sso',
         '*'
     ];
 }
