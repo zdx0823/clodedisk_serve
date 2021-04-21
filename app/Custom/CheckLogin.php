@@ -1,12 +1,9 @@
 <?php
 
-namespace App\Http\Middleware;
+namespace App\Custom\CheckLogin;
 
-use Closure;
 use Cookie;
 use Session;
-
-use Illuminate\Http\Request;
 
 use App\Custom\Common\CustomCommon;
 
@@ -29,20 +26,11 @@ class CheckLogin
      */
     private static function checkTgc ($tgc) {
 
-        $client = new Client;
-        $data = CustomCommon::deJson('');
+        $url = config('custom.sso.check_tgc');
+        $data = CustomCommon::client('POST', $url, [
+            'form_params' => compact('tgc')
+        ]);
 
-        try {
-            
-            $clientRes = $client->request('POST', config('custom.sso.check_tgc'), [
-                'form_params' => compact('tgc')
-            ]);
-
-            $data = CustomCommon::deJson($clientRes->getBody());
-            
-        } catch (\Throwable $th) {}
-
-        
         return ($data['status'] == 1);
     }
 
@@ -100,7 +88,7 @@ class CheckLogin
      * 1. 不相等，可能是session过期或session的tgc被SSO发起的请求删掉了
      * 2. cookie的tgc不存在，则未登录
      */
-    public function handle(Request $request, Closure $next) {
+    public static function handle() {
 
         // 是否为第一次进网页，做一些自检工作
         self::firstRequest();
@@ -108,7 +96,7 @@ class CheckLogin
         $tgc = Cookie::get('tgc');
         
         // tgc不存在，返回
-        if (!$tgc) return 233;
+        if (!$tgc) return false;
 
         // cookie和session的tgc不相等
         if (!self::isHasSameTgc()) {
@@ -119,16 +107,16 @@ class CheckLogin
             // 检查结果，tgc不可用，删掉tgc，返回
             if (!$checkTgcRes) {
                 self::delTgc();
-                return 233;
+                return false;
             };
 
             // tgc还能用，更新session的值
             session(['tgc' => $tgc]);
 
             // 结束中间件
-            return $next($request);
+            return true;
         }
 
-        return $next($request);
+        return true;
     }
 }

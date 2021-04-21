@@ -11,6 +11,6 @@ return [
     'check_st' => env('SSO_CHECK_ST'),
     'check_tgc' => env('SSO_CHECK_TGC'),
     'logout' => env('SSO_LOGOUT'),
-    'info' => env('SSO_INFO'),
+    'user_info' => env('SSO_USER_INFO'),
   ]
 ];

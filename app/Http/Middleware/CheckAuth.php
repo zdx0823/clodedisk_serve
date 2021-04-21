@@ -4,134 +4,97 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Auth;
+use Cookie;
 
 use Illuminate\Http\Request;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ServerException;
 
 use App\Custom\Common\CustomCommon;
+use App\Custom\CheckLogin\CheckLogin;
+use App\Custom\CheckSt\CheckSt;
 
-class CheckAuth
-{
+/**
+ * 检查用户是否有权限
+ * 1. 是否已登录
+ * 2. 没登录，是否有ST，ST是否可用
+ * 3. 拉取用户信息存储到session
+ */
+class CheckAuth {
 
     private $needJsonRoute = [];
     private $needViewRoute = ['indexPage'];
 
     /**
-     * 是否登录超时
-     * 根据 config('custom.user_session_key')的session中的 id 和 timeout判断
-     * 当前时间大于timeout表示超时
-     * 
-     * 返回布尔值
+     * 生成错误的返回结果
+     * 生成一个重定向的url，返回给前端重定向使用
      */
-    private function isAuthTimeout () {
+    private static function makeErrRes ($request) {
 
-        [
-            'id' => $id,
-            'timeout' => $timeout
-        ] = session()->get(config('custom.user_session_key'));
-
-        // var_dump(session()->all());
-        if ($id == null) return false;
-        if (time() > $timeout) return false;
-
-        return true;
-    }
-
-
-    private function attemptLogin ($st) {
-
-        $client = new Client;
-
-        $clientRes = $client->request('POST', 'http://localhost:90/check_st', [
-            'form_params' => ['st' => $st]
-        ]);
-
-        // 返回结果是字符串，期望值 ['data' => ['user' => xxxx]]
-        // 'user' 是加密值，期望解密后为 ['id', 'timeout'] 的json字符串
-        $data = null;
-        try {
-
-            $data = json_decode($clientRes->getBody(), true);
-            if (!is_array($data)) {
-                $data = null;
-                return;
-            }
-
-            $data = $data['data'];
-            if (!array_key_exists('user', $data)) {
-                $data = null;
-                return;
-            }
-
-            $user = CustomCommon::decrypt($data['user']);
-            if (!$user) {
-                $data = null;
-                return;
-            }
-
-            $data = json_decode($user, true);
-            if (!array_key_exists('id', $data) || !array_key_exists('timeout', $data)) $data = null;
-
-        } catch (ServerException $e) {}
-
-        // $data 为null，返回值错误，未登录
-        if ($data == null) return false;
-
-        // 记录成登录状态
-        $sessionKey = config('custom.user_session_key');
-
-        session([ $sessionKey => $data ]);
-
-        return true;
-    }
-
-
-    public function handle(Request $request, Closure $next)
-    {
-
-        // 判断需要返回视图还是json数据
-        $routeName = $request->route()->getName();
-
-        $SSO_URL = config('custom.sso.login');
-        $curUrl = $request->url();
-        $SSO_URL = "$SSO_URL?serve=$curUrl";
+        $curUrl = $request->getUri();
+        $SSO = config('custom.sso.login');
+        $SSO = "$SSO?serve=$curUrl";
 
         // json返回值
-        $jsonRes = CustomCommon::makeErrRes(
+        $res = CustomCommon::makeErrRes(
             '未登录，请登录后操作',
             [],
-            [ 'sso' => $SSO_URL ],
+            [ 'sso' => $SSO ],
             -2,
         );
 
-        // view返回值
-        $viewRes = redirect($SSO_URL);
-        $res = \in_array($routeName, $this->needViewRoute)
-            ? $viewRes
-            : response()->json($jsonRes);
+        return $res;
+    }
 
-        $st = $request->st;
 
-        // var_dump($this->isAuthTimeout());
-        // 没登录
-        if (!$this->isAuthTimeout()) {
+    /**
+     * 向SSO拉取用户信息
+     * 需要tgc作为参数发送请求
+     * 成功请求到数据将赋值到session，session的key是tgc，值就是数据
+     */
+    private static function pullUserInfo () {
 
-            // 且没有st
-            if ($st == null) return $res;
+        $tgc = Cookie::get('tgc');
 
-            // 有st，根据st，尝试登录
-            $attemptRes = self::attemptLogin($st);
+        if (session()->has($tgc)) return;
 
-            // 尝试失败，返回
-            if (!$attemptRes) return $res;
+        // 发送请求
+        $url = config('custom.sso.user_info');
+        $data = CustomCommon::client('POST', $url, [
+            'form_params' => compact('tgc')
+        ]);
 
-            // var_dump(session()->all());
-            // 通过，执行next
-            return $next($request);
+        // 请求失败，静默返回
+        if ($data['status'] === -1) return;
+
+        $userInfo = $data['data'];
+
+        session([ $tgc => $userInfo ]);
+    }
+
+
+    /**
+     * 验证用户是否有权限
+     * 引导程序
+     */
+    public function handle(Request $request, Closure $next) {
+
+        // 没登录，且ST不可用，返回
+        if (!CheckLogin::handle()) {
+        
+            if (!CheckSt::handle($request)) {
+                return response()->json(self::makeErrRes($request));
+            }
+
+            // 删掉st的query字段
+            $redirectUrl = Customcommon::delQuery($request->getUri(), [ 'st' ]);
+            return redirect($redirectUrl);
+
         }
 
-        // 已登录，且未超时，正常登录
+        // 已登录，或未登录但ST可用，正常
+
+        // 拉取用户数据
+        self::pullUserInfo();
+
         return $next($request);
     }
 }
