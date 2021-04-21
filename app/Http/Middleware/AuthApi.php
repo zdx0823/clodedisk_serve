@@ -13,15 +13,13 @@ use App\Custom\CheckLogin\CheckLogin;
 use App\Custom\CheckSt\CheckSt;
 
 /**
- * 检查用户是否有权限
+ * api鉴权，检查用户是否有权限
  * 1. 是否已登录
- * 2. 没登录，是否有ST，ST是否可用
- * 3. 拉取用户信息存储到session
+ * 2. 拉取用户信息存储到session
+ * 3. 未登录返回重定向的url
  */
-class CheckAuth {
+class AuthApi {
 
-    private $needJsonRoute = [];
-    private $needViewRoute = ['indexPage'];
 
     /**
      * 生成错误的返回结果
@@ -29,9 +27,7 @@ class CheckAuth {
      */
     private static function makeErrRes ($request) {
 
-        $curUrl = $request->getUri();
         $SSO = config('custom.sso.login');
-        $SSO = "$SSO?serve=$curUrl";
 
         // json返回值
         $res = CustomCommon::makeErrRes(
@@ -77,22 +73,15 @@ class CheckAuth {
      */
     public function handle(Request $request, Closure $next) {
 
-        // 没登录，且ST不可用，返回
+        // 没登录，返回
         if (!CheckLogin::handle()) {
         
-            if (!CheckSt::handle($request)) {
-                return response()->json(self::makeErrRes($request));
-            }
-
-            // 删掉st的query字段
-            $redirectUrl = Customcommon::delQuery($request->getUri(), [ 'st' ]);
-            return redirect($redirectUrl);
+            return response()->json(self::makeErrRes($request));
 
         }
 
-        // 已登录，或未登录但ST可用，正常
 
-        // 拉取用户数据
+        // 已登录，拉取用户数据
         self::pullUserInfo();
 
         return $next($request);

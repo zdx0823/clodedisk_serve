@@ -1,7 +1,7 @@
 <?php
 use App\Http\Controllers;
 
-Route::prefix('/api/clodedisk')->middleware(['checkAuth', 'checkParams'])->group(function () {
+Route::prefix('/api/clodedisk')->middleware(['authApi', 'checkParams'])->group(function () {
 
   // 获取文件，文件夹列表
   Route::get('/list', 'DiskController@list')->name('list');
@@ -26,7 +26,7 @@ Route::prefix('/api/clodedisk')->middleware(['checkAuth', 'checkParams'])->group
 
 
 // 静态页面
-Route::get('/', 'StaticPageController@index')->middleware('checkAuth')->name('indexPage');
+Route::get('/', 'StaticPageController@index')->middleware('authPage')->name('indexPage');
 
 
 // 后备路由

@@ -9,8 +9,9 @@ use App\Custom\Common\CustomCommon;
 
 
 /**
- * 查看请求参数中是否存在ST，存在ST则向SSO进行验证
- * 验证成功将tgc存入cookie和session
+ * url是否存在ST的query参数，有则向SSO验证
+ * 1. 可用，向cookie和session写入tgc值
+ * 2. 不可用，结束，返回false
  * 
  * 结果返回布尔值
  */

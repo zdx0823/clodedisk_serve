@@ -678,7 +678,6 @@ class PasetController extends Controller
                 $distId
             ];
 
-            // var_dump($fidMap);
             $deWeightData = self::deWeightNames([
                 'distId' => $distId,
                 'nameField' => 'alias',

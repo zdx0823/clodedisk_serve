@@ -9,11 +9,11 @@ use App\Custom\Common\CustomCommon;
 
 
 /**
- * 判断当前用户是否已登录，cookie和session的tgc是否相等
- * 可以改动tgc的程序：
- * 1. session自动过期
- * 2. cookie的tgc过期
- * 3. SSO向本系统发起删除该用户tgc的请求
+ * 判断用户是否登录
+ * 1. 首次打开浏览器，向SSO验证，返回布尔值
+ * 2. cookie和session的tgc不同步，向SSO验证，成功，同步两则的值，失败删掉两者的值，返回布尔值
+ * 
+ * 返回布尔值
  */
 class CheckLogin
 {
@@ -87,6 +87,8 @@ class CheckLogin
      * 判断是否登录，根据cookie和session的tgc是否相等判断
      * 1. 不相等，可能是session过期或session的tgc被SSO发起的请求删掉了
      * 2. cookie的tgc不存在，则未登录
+     * 
+     * 返回布尔值
      */
     public static function handle() {
 
