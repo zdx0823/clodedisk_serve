@@ -34,6 +34,8 @@ Route::post('/api/clodedisk/logout', 'SessionController@logout')->name('logout')
 // SSO登出
 Route::post('/api/clodedisk/logout/sso', 'SessionController@ssoLogout')->name('ssoLogout');
 
+Route::get('/test', 'SessionController@test');
+
 // 后备路由
 Route::any('/{any}', function () {
   return [

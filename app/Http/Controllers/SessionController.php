@@ -57,4 +57,9 @@ class SessionController extends Controller
         return CustomCommon::makeSuccRes(compact('tgc'));
     }
 
+
+    public function test (Request $request) {
+        return '测试';
+    }
+
 }

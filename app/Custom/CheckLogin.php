@@ -40,7 +40,7 @@ class CheckLogin
      */
     private static function delTgc () {
 
-        Cookie::queue('tgc', 'null', -99999);
+        Cookie::queue(Cookie::forget('tgc'));
         Session::forget('tgc');
 
     }
