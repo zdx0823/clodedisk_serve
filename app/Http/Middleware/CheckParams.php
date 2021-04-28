@@ -184,7 +184,7 @@ class CheckParams
     {
         $routeName = $request->route()->getName();
 
-        if (!isset($this->$routeName)) return $next($request);
+        if (!method_exists($this, $routeName)) return $next($request);
 
         $res = $this->$routeName($request);
         if ($res !== true) {
