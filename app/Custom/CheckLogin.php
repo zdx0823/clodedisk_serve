@@ -27,8 +27,9 @@ class CheckLogin
     private static function checkTgc ($tgc) {
 
         $url = config('custom.sso.check_tgc');
+        $session_id = Session()->getId();
         $data = CustomCommon::client('POST', $url, [
-            'form_params' => compact('tgc')
+            'form_params' => compact('tgc', 'session_id')
         ]);
 
         return ($data['status'] == 1);
