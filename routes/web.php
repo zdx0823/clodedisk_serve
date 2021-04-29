@@ -1,7 +1,13 @@
 <?php
 use App\Http\Controllers;
 
-Route::prefix('/api/clodedisk')->middleware(['authApi', 'checkParams'])->group(function () {
+Route::prefix('/api/clodedisk')
+  ->middleware([
+        'authApi',
+        'checkParams',
+        'checkLoggedToken'
+    ])
+  ->group(function () {
 
   // 获取文件，文件夹列表
   Route::get('/list', 'DiskController@list')->name('list');
@@ -26,15 +32,26 @@ Route::prefix('/api/clodedisk')->middleware(['authApi', 'checkParams'])->group(f
 
 
 // 静态页面
-Route::get('/', 'StaticPageController@index')->middleware('authPage')->name('indexPage');
+Route::get('/', 'StaticPageController@index')->name('indexPage');
 
 // 登出
-Route::post('/api/clodedisk/logout', 'SessionController@logout')->name('logout');
+Route::post('/logout', 'SessionController@logout')->name('logout');
 
 // SSO登出
-Route::post('/api/clodedisk/logout/sso', 'SessionController@ssoLogout')->name('ssoLogout');
+Route::post('/logout/sso', 'SessionController@ssoLogout')->name('ssoLogout');
 
 Route::get('/test', 'SessionController@test');
+
+// 登录相关
+Route::prefix('/login')->group(function () {
+
+  Route::post('/check_st', 'SessionController@checkSt')->name('login_checkSt');
+  Route::post('/check_login', 'SessionController@checkLogin')->name('login_checkLogin');
+  Route::post('/has_logged_token', 'SessionController@hasLoggedToken')->name('login_hasLoggedToken');
+  Route::post('/confirm/send_code', 'SessionController@sendCode')->name('login_sendCode');
+  Route::post('/confirm/confirm', 'SessionController@confirmCode')->name('login_confirmCode');
+
+});
 
 // 后备路由
 Route::any('/{any}', function () {

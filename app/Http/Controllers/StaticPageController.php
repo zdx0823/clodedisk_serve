@@ -11,11 +11,6 @@ class StaticPageController extends Controller
     
     public function index (Request $request) {
 
-        // 未登录
-        if (!CheckLogin::handle()) {
-
-        }
-
         return view('index');
     }
 

@@ -8,6 +8,8 @@ use Cookie;
 use Session;
 
 use App\Custom\Common\CustomCommon;
+use App\Custom\CheckLogin\CheckLogin;
+use App\Custom\CheckSt\CheckSt;
 
 class SessionController extends Controller
 {
@@ -43,17 +45,6 @@ class SessionController extends Controller
         Cookie::queue('tgc', 'null', -99999);
         Session::forget('tgc');
 
-        // 发起请求，让SSO登出其他子系统
-        // $url = config('custom.sso.logout');
-        // $res = CustomCommon::client('POST', $url, [
-        //     'form_params' => compact('tgc')
-        // ]);
-
-        // $msg = $res['status'] == -1
-        //     ? self::S_LOGOUT_FAIL
-        //     : self::S_LOGOUT_SUCC;
-        
-        // $after = config('custom.sso.login');
         return CustomCommon::makeSuccRes(compact('tgc'));
     }
 
@@ -62,4 +53,25 @@ class SessionController extends Controller
         return '测试';
     }
 
+
+    /**
+     * 检查是否登录
+     */
+    public function checkLogin (Request $request) {
+
+        if (!CheckLogin::handle()) return CustomCommon::makeErrRes('未登录');
+
+        return CustomCommon::makeSuccRes([], '已登录');
+    }
+
+
+    /**
+     * 检查ST是否可用
+     */
+    public function checkSt (Request $request) {
+
+        if (!CheckSt::handle($request)) return CustomCommon::makeErrRes('未登录');
+
+        return CustomCommon::makeSuccRes([], '已登录');
+    }
 }
