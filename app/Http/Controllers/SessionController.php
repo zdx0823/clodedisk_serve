@@ -58,6 +58,17 @@ class SessionController extends Controller
     }
 
 
+    public function userInfo () {
+
+        $userSid = config('custom.session.user_info');
+        $userInfo = \session()->get($userSid);
+
+        return CustomCommon::makeSuccRes([
+            'username' => $userInfo['username']
+        ]);
+    }
+
+
     /**
      * 检查是否登录
      */
