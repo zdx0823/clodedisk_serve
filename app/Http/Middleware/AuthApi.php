@@ -11,6 +11,35 @@ use Illuminate\Http\Request;
 use App\Custom\Common\CustomCommon;
 use App\Custom\CheckLogin\CheckLogin;
 use App\Custom\CheckSt\CheckSt;
+use App\Custom\PullUserInfo\PullUserInfo;
+
+
+class ErrMsg {
+
+
+    public static function notLogin () {
+
+        $SSO = config('custom.sso.login');
+
+        // json返回值
+        $res = CustomCommon::makeErrRes(
+            '未登录，请登录后操作', [], 
+            [ 'sso' => $SSO ],
+            -2,
+        );
+
+        return $res;
+    }
+
+
+    public static function notSecVerify () {
+
+        return CustomCommon::makeErrRes(
+            '需要二次认证，请输入邮箱验证码', [], [], -3
+        );
+    }
+}
+
 
 /**
  * api鉴权，检查用户是否有权限
@@ -20,50 +49,26 @@ use App\Custom\CheckSt\CheckSt;
  */
 class AuthApi {
 
-
-    /**
-     * 生成错误的返回结果
-     * 生成一个重定向的url，返回给前端重定向使用
-     */
-    private static function makeErrRes ($request) {
-
-        $SSO = config('custom.sso.login');
-
-        // json返回值
-        $res = CustomCommon::makeErrRes(
-            '未登录，请登录后操作',
-            [],
-            [ 'sso' => $SSO ],
-            -2,
-        );
-
-        return $res;
-    }
+    private const S_FORBIDDEN = '您无权限访问此页面';
 
 
     /**
-     * 向SSO拉取用户信息
-     * 需要tgc作为参数发送请求
-     * 成功请求到数据将赋值到session，session的key是tgc，值就是数据
+     * 是否为管理员
+     * 1. 不是，下一步
+     * 2. 是，有没有做二次验证
+     * 2-1. 无，返回错误值
+     * 2-2. 有，下一步
+     * 
+     * 返回true，false，错误提示语
      */
-    private static function pullUserInfo () {
+    private static function isAdmin ($userInfo) {
 
-        $tgc = Cookie::get('tgc');
+        if (!$userInfo['isAdmin']) return false;
 
-        if (session()->has($tgc)) return;
+        $loggedTmpKey = config('custom.cookie.logged_tmp');
+        if (Cookie::get($loggedTmpKey) != null) return true;
 
-        // 发送请求
-        $url = config('custom.sso.user_info');
-        $data = CustomCommon::client('GET', $url, [
-            'form_params' => compact('tgc')
-        ]);
-
-        // 请求失败，静默返回
-        if ($data['status'] === -1) return;
-
-        $userInfo = $data['data'];
-
-        session([ $tgc => $userInfo ]);
+        return self::S_FORBIDDEN;
     }
 
 
@@ -76,13 +81,21 @@ class AuthApi {
         // 没登录，返回
         if (!CheckLogin::handle()) {
         
-            return response()->json(self::makeErrRes($request));
+            return response()->json(ErrMsg::notLogin());
 
         }
 
-
         // 已登录，拉取用户数据
-        self::pullUserInfo();
+        $userInfo = PullUserInfo::handle();
+
+        // 是否为管理员，检查是否二次验证过
+        $isAdmin = self::isAdmin($userInfo);
+
+        if (\is_string($isAdmin)) {
+
+            $res = ErrMsg::notSecVerify();
+            return \response()->json($res);
+        }
 
         return $next($request);
     }

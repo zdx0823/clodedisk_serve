@@ -10,12 +10,16 @@ use Session;
 use App\Custom\Common\CustomCommon;
 use App\Custom\CheckLogin\CheckLogin;
 use App\Custom\CheckSt\CheckSt;
+use App\Custom\CheckLoggedToken\CheckLoggedToken;
 
 class SessionController extends Controller
 {
 
     private const S_LOGOUT_FAIL = '登出失败，请稍后重试';
     private const S_LOGOUT_SUCC = '登出成功';
+    private const S_SEND_SUCC = '发送成功';
+    private const S_CONFIRM_ERR = '验证码错误或已失效';
+    private const S_CONFIRM_SUCC = '验证成功';
     
     /**
      * 登出接口，供SSO使用
@@ -73,5 +77,35 @@ class SessionController extends Controller
         if (!CheckSt::handle($request)) return CustomCommon::makeErrRes('未登录');
 
         return CustomCommon::makeSuccRes([], '已登录');
+    }
+
+
+    /**
+     * 发送二次鉴权验证码
+     */
+    public function sendCode (Request $request) {
+
+        $userSid = config('custom.session.user_info');
+        $userInfo = \session()->get($userSid);
+        $email = $userInfo['email'];
+
+        $res = CheckLoggedToken::sendCode($email);
+
+        if ($res !== true) return CustomCommon::makeErrRes($res);
+
+        return CustomCommon::makeSuccRes([], self::S_SEND_SUCC);
+    }
+
+
+    /**
+     * 核实验证码
+     */
+    public function confirmCode (Request $request) {
+
+        $res = CheckLoggedToken::checkCode($request->code);
+
+        if (!$res) return CustomCommon::makeErrRes(self::S_CONFIRM_ERR);
+
+        return CustomCommon::makeSuccRes([], self::S_CONFIRM_SUCC);
     }
 }
