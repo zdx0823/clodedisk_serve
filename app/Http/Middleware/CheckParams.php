@@ -27,7 +27,7 @@ class CheckParams
         }
         $str = rtrim($str, '\n');
 
-        $result = ClodediskCommon::makeErrRes($str, $msgArr);
+        $result = CustomCommon::makeErrRes($str, $msgArr);
         return $result;
     }
 
@@ -164,6 +164,19 @@ class CheckParams
             'idList.*' => 'bail|required|array',
             'idList.*.id' => 'bail|required|numeric',
             'idList.*.type' => 'bail|required|in:file,folder',
+        ]);
+
+        if ($res->fails() !== false) return $this->makeErrRes($res);
+
+        return true;
+    }
+
+
+    private function login_confirmCode ($request) {
+
+        $validateData = $request->input();
+        $res = Validator::make($validateData, [
+            'code' => 'bail|required|numeric',
         ]);
 
         if ($res->fails() !== false) return $this->makeErrRes($res);

@@ -74,7 +74,9 @@ class AuthApi {
 
     /**
      * 验证用户是否有权限
-     * 引导程序
+     * 1. 是否登录
+     * 2. 是否为管理员
+     * 
      */
     public function handle(Request $request, Closure $next) {
 

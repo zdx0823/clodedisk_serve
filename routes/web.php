@@ -42,11 +42,10 @@ Route::post('/logout/sso', 'SessionController@ssoLogout')->name('ssoLogout');
 Route::get('/test', 'SessionController@test');
 
 // 登录相关
-Route::prefix('/login')->group(function () {
+Route::prefix('/login')->middleware(['checkParams'])->group(function () {
 
   Route::post('/check_st', 'SessionController@checkSt')->name('login_checkSt');
   Route::post('/check_login', 'SessionController@checkLogin')->name('login_checkLogin');
-  Route::post('/has_logged_token', 'SessionController@hasLoggedToken')->name('login_hasLoggedToken');
 
   // 发送验证码
   Route::post('/confirm/send_code', 'SessionController@sendCode')
