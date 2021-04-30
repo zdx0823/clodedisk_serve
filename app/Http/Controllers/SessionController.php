@@ -108,4 +108,28 @@ class SessionController extends Controller
 
         return CustomCommon::makeSuccRes([], self::S_CONFIRM_SUCC);
     }
+
+
+    /**
+     * 是否需要二次验证
+     */
+    public function isNeedConfirm (Request $request) {
+
+        $userSid = \config('custom.session.user_info');
+        $userInfo = session()->get($userSid);
+
+        $res = true;
+
+        if ($userInfo['isAdmin'] === false) {
+            
+            $res = false;
+        } else {
+
+            $res = !CheckLoggedToken::hasToken();
+        }
+
+        return CustomCommon::makeSuccRes([
+            'isNeed' => $res
+        ]);
+    }
 }

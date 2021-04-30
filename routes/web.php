@@ -57,6 +57,11 @@ Route::prefix('/login')->middleware(['checkParams'])->group(function () {
     ->middleware('pullUserInfo')
     ->name('login_confirmCode');
 
+  // 是否需要二次验证
+  Route::post('/confirm/is_need', 'SessionController@isNeedConfirm')
+    ->middleware('pullUserInfo')
+    ->name('login_isNeedConfirm');
+
 });
 
 // 后备路由
