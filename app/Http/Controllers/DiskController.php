@@ -110,7 +110,8 @@ class DiskController extends Controller
         $ext = $item['extend_info']['ext'];
         if (!in_array($ext, ['jpg', 'jpeg', 'png'])) return $item;
 
-        $item['img_path'] = config('custom.resource_img_url') . '/' . $item['name'];
+        // $item['img_path'] = config('custom.resource_img_url') . '/' . $item['name'];
+        $item['img_path'] = "http://localhost:89/api/clodedisk/img/" . $item['name'];
         $item['img_path_sm'] = $item['img_path'] . '?w=300';
 
         return $item;
@@ -690,5 +691,79 @@ class DiskController extends Controller
         }
 
         return CustomCommon::makeSuccRes([], '删除成功');
+    }
+
+
+    public function img (Request $request, $imgPath) {
+
+        $disk = Storage::disk('uploadFiles');
+
+        $filename = $disk->path($imgPath);
+
+        // 设置内容类型
+        $mime = image_type_to_mime_type(exif_imagetype($filename));
+    
+        $explodedMime = explode('/', $mime);
+        $type = $explodedMime[1];
+    
+        // imageFn函数对应的压缩比
+        $imageQuality = [
+          'image/jpeg' => '50',
+          'image/png' => '9',
+          'image/webp' => '50',
+          // 'image/gif' => '9',
+        ];
+    
+        // 获取新的尺寸
+        list($width, $height) = getimagesize($filename);
+    
+        // 图片大小
+        $new_width = $width;
+        $new_height = $height;
+    
+        // url是否有规定图片大小，固定宽高设置 > 缩放比设置
+        $query = $request->input();
+    
+        // 是否有填写缩放比
+        if (array_key_exists('percent', $query) && is_numeric($query['percent'])) {
+          $percent = $query['percent'];
+          $new_width = $width * $percent;
+          $new_height = $height * $percent;
+        }
+    
+        // 如果只填写了宽，没有高，则按照宽的缩放比例来处理
+        if (array_key_exists('w', $query) && !array_key_exists('h', $query)) {
+          $w = $query['w'];
+          if (is_numeric(intval($w)) && intval($w) > 1) {
+            $percent = $w / $new_width;
+            $new_width = $new_width * $percent;
+            $new_height = $new_height * $percent;
+          }
+        } else {
+          if (array_key_exists('w', $query) && is_numeric($query['w']) && $query['w'] > 1) {
+            $new_width = intval($query['w']);
+          }
+      
+          if (array_key_exists('h', $query) && is_numeric($query['h']) && $query['h'] > 1) {
+            $new_height = intval($query['h']);
+          }
+        }
+    
+        
+        // 获取对应的图片处理函数
+        $createFnName = "imagecreatefrom$type";
+
+        $img = call_user_func($createFnName, $filename);        // 创建一个新图像
+        imagesavealpha($img, true);                             // 保存透明色道
+        $dim = imagecreatetruecolor($new_width, $new_height);  // 创建画布设定大小
+        imagealphablending($dim, false);                       // 不用合并图像颜色，直接用$img的颜色替换$dim包括透明色
+        imagesavealpha($dim, true);                            // 保存画布的透明色
+        imagecopyresampled($dim, $img, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+    
+        // 输出
+        $imageFnName = "image$type";
+        $quality = $imageQuality[$mime];
+        header("Content-Type: $mime");
+        $content = call_user_func_array($imageFnName, [$dim, NULL, $quality]);
     }
 }

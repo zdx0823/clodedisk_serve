@@ -27,6 +27,8 @@ Route::prefix('/api/clodedisk')
   // 删除文件或文件夹
   Route::delete('/', 'DiskController@destroy')->name('destroy');
 
+  // 图片资源链接
+  Route::get('/img/{img}', 'DiskController@img')->name('img');
 });
 
 
