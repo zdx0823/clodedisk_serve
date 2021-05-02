@@ -12,6 +12,7 @@ use App\Custom\Common\CustomCommon;
 use App\Custom\CheckLogin\CheckLogin;
 use App\Custom\CheckSt\CheckSt;
 use App\Custom\PullUserInfo\PullUserInfo;
+use App\Custom\CheckLoggedToken\CheckLoggedToken;
 
 
 class ErrMsg {
@@ -65,9 +66,8 @@ class AuthApi {
 
         if (!$userInfo['isAdmin']) return false;
 
-        $loggedTmpKey = config('custom.cookie.logged_tmp');
-        if (Cookie::get($loggedTmpKey) != null) return true;
-
+        if (CheckLoggedToken::hasToken()) return true;
+        
         return self::S_FORBIDDEN;
     }
 

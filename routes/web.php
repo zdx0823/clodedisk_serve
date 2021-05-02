@@ -68,7 +68,9 @@ Route::prefix('/login')->middleware(['checkParams'])->group(function () {
 
 
 // 获取用户信息
-Route::get('/user_info', 'SessionController@userInfo')->name('userInfo');
+Route::get('/user_info', 'SessionController@userInfo')
+  ->middleware('pullUserInfo')
+  ->name('userInfo');
 
 
 // 后备路由

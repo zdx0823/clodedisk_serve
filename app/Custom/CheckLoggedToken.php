@@ -62,13 +62,21 @@ class CheckLoggedToken
 
     /**
      * 检查是否有临时token
+     * cookie不存在，session没有相同项，返回false
+     * 否则返回true
      */
     public static function hasToken () {
 
         // 已登录，是否有临时登录凭证
-        $loggedTokenKey = \config('custom.cookie.logged_tmp');
+        $cid = \config('custom.cookie.logged_tmp');
+        $sid = config('custom.session.user_info');
+        $userInfo = session()->get($sid);
 
-        return Cookie::get($loggedTokenKey) != null;
+        if (Cookie::get($cid) == null) return false;
+        if (!array_key_exists($cid, $userInfo)) return false;
+        if (Cookie::get($cid) !== $userInfo[$cid]) return false;
+
+        return true;
     }
 
 
@@ -107,12 +115,19 @@ class CheckLoggedToken
 
 
     // 生成临时token
-    private static function buildTmpToken () {
+    private static function setTmpToken () {
 
         $token = CustomCommon::build_token();
 
-        $sid = config('custom.cookie.logged_tmp');
-        Cookie::queue($sid, $token);
+        $cid = config('custom.cookie.logged_tmp');
+        Cookie::queue($cid, $token);
+
+        $sid = config('custom.session.user_info');
+        $userInfo = session($sid);
+        $userInfo[$cid] = $token;
+        session([
+            $sid => $userInfo
+        ]);
     }
 
 
@@ -142,7 +157,7 @@ class CheckLoggedToken
                 return false;
             }
 
-            self::buildTmpToken();
+            self::setTmpToken();
             self::delCodeSession();
             return true;
         }
