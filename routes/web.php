@@ -29,6 +29,9 @@ Route::prefix('/api/clodedisk')
 
   // 图片资源链接
   Route::get('/img/{img}', 'DiskController@img')->name('img');
+
+  // 设置文件夹成共享
+  Route::get('/folder/shared', 'DiskController@updateFolderShared')->name('updateFolderShared');
 });
 
 

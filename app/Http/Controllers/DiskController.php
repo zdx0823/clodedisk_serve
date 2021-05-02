@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\UploadFolder;
 use App\Models\UploadFile;
 use App\Custom\Common\CustomCommon;
+use App\Custom\UserInfo\UserInfo;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -32,12 +33,16 @@ class DiskController extends Controller
         if (!in_array($routeName, $list)) return $next($request);
         if ($request->fid != 0) return $next($request);
 
-        $uid = 1;
-        $uid_type = 3;
+        $uid = UserInfo::id();
+
+        // 如果uid为1表示为管理员，管理员的fid为null，其他的fid为2
+        $preFid = $uid === 1
+            ? null
+            : 2;
+
         $fid = UploadFolder::select(['id'])
-                ->where('uid_type', $uid_type)
                 ->where('uid', $uid)
-                ->where('fid', null)
+                ->where('fid', '=', $preFid)
                 ->first()->id;
 
         $request->fid = $fid;
@@ -127,8 +132,6 @@ class DiskController extends Controller
     protected function listByFid ($params) {
 
         [
-            'uid' => $uid,
-            'uid_type' => $uid_type,
             'fid' => $fid,
             'offset' => $offset,
             'limit' => $limit,
@@ -139,8 +142,6 @@ class DiskController extends Controller
         // 检查id = fid 的文件夹存不存在
         $isFidExist = UploadFolder::select(['id'])
             ->where('id', $fid)
-            ->where('uid', $uid)
-            ->where('uid_type', $uid_type)
             ->first();
         if ($isFidExist == null) {
             return false;
@@ -149,8 +150,6 @@ class DiskController extends Controller
 
         // 拿出10个文件夹
         $folders = UploadFolder::select(['id', 'fid', 'name', 'ctime'])
-            ->where('uid_type', $uid_type)
-            ->where('uid', $uid)
             ->where('fid', $fid)
             ->orderBy('ctime', $order)
             ->limit($limit)
@@ -271,7 +270,6 @@ class DiskController extends Controller
         $baseId = UploadFolder::select(['id'])
             ->where('fid', null)
             ->where('uid', $uid)
-            ->where('uid_type', $uid_type)
             ->first()
             ->value('id');
 
@@ -765,5 +763,16 @@ class DiskController extends Controller
         $quality = $imageQuality[$mime];
         header("Content-Type: $mime");
         $content = call_user_func_array($imageFnName, [$dim, NULL, $quality]);
+    }
+
+
+    // 设置文件夹共享状态
+    public function updateFolderShared (Request $request) {
+
+        $status = $request->status;
+        $fid = $request->fid;
+
+
+
     }
 }

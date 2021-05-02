@@ -44,14 +44,7 @@ class PullUserInfo {
 
         $userSessionKey = config('custom.session.user_info');
 
-        $data = [
-            'id' => $userInfo['id'],
-            'username' => $userInfo['username'],
-            'email' => $userInfo['email'],
-            'isAdmin' => $userInfo['isAdmin'],
-        ];
-
-        session([ $userSessionKey => $data ]);
+        session([ $userSessionKey => $userInfo ]);
 
         return $data;
     }

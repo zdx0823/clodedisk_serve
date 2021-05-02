@@ -9,17 +9,16 @@ use DB;
 
 class UploadFolderSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
-    public function run()
-    {
 
+    private static function buildUser ($userBaseId, $uid, $uid_type) {
+
+        $_name = "用户_" . ($uid - 1) . "的顶层目录";
         // 生成用户1的顶层目录取出id
-        $baseId = UploadFolder::factory()->times(1)->create([
-            'name' => '用户_1的顶层目录',
+        $user_1 = UploadFolder::factory()->times(1)->create([
+            'fid' => $userBaseId,
+            'name' => $_name,
+            'uid' => $uid,
+            'uid_type' => $uid_type,
             UploadFolder::CREATED_AT => time(),
             UploadFolder::UPDATED_AT => time()
         ])->first()->id;
@@ -28,7 +27,9 @@ class UploadFolderSeeder extends Seeder
         $users = UploadFolder::factory()
             ->times(10)
             ->create([
-                'fid' => $baseId,
+                'uid' => $uid,
+                'uid_type' => $uid_type,
+                'fid' => $user_1,
             ]);
 
         // 取出10条数据的id
@@ -42,8 +43,39 @@ class UploadFolderSeeder extends Seeder
             ->times(20)
             ->state(new Sequence(...$user_ids))
             ->create([
+                'uid' => $uid,
+                'uid_type' => $uid_type,
                 UploadFolder::CREATED_AT => time(),
                 UploadFolder::UPDATED_AT => time()
             ]);
+    }
+
+    /**
+     * Run the database seeds.
+     *
+     * @return void
+     */
+    public function run()
+    {
+
+        // 生成管理员目录
+        $baseId = UploadFolder::factory()->times(1)->create([
+            'name' => 'root',
+            UploadFolder::CREATED_AT => time(),
+            UploadFolder::UPDATED_AT => time()
+        ])->first()->id;
+
+        // 生成所有用户目录
+        $userBaseId = UploadFolder::factory()->times(1)->create([
+            'fid' => $baseId,
+            'name' => '所有用户',
+            UploadFolder::CREATED_AT => time(),
+            UploadFolder::UPDATED_AT => time()
+        ])->first()->id;
+
+        // 生成3个用户的顶层文件夹
+        self::buildUser($userBaseId, 2, 3);
+        self::buildUser($userBaseId, 3, 3);
+        self::buildUser($userBaseId, 4, 3);
     }
 }
