@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 use App\Models\UploadFolder;
 use App\Models\UploadFile;
 use App\Models\FolderShared;
+use App\Models\FileShared;
 
 use App\Custom\Common\CustomCommon;
 use App\Custom\UserInfo\UserInfo;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\diskController\CommonController as DISKCommon;
 
 /**
  * 鉴定用户操作的数据是否属于它本人的
@@ -135,12 +137,23 @@ class IsChangeable {
 
     public static function updateFolderShared ($request) {
 
-
         $uid = UserInfo::id();
-        $ins = UploadFolder::find($request->fid);
 
-        if ($ins == null) return false;
-        if ($uid !== $ins->uid) return false;
+        $type = $request->type;
+        $id = $request->id;
+
+        if ($type === 'folder') {
+
+            $ins = UploadFolder::find($id);
+            if ($ins == null) return false;
+            if ($ins->uid !== $uid) return false;
+        } else {
+
+            $ins = UploadFile::find($id);
+            if ($ins == null) return false;
+            $folder = UploadFolder::find($ins->fid);
+            if ($folder->uid !== $uid) return false;
+        }
 
         return true;
     }
@@ -629,7 +642,7 @@ class DiskController extends Controller
             $alias = substr($finalName, mb_strlen($finalName) - 16);
 
             // 插入数据库记录
-            $insertId = diskController\commonController::insertFileToDB([
+            $insertId = DISKCommon::insertFileToDB([
                 'fid' => $fid,
                 'name' => $finalName,
                 'alias' => $alias,
@@ -929,20 +942,36 @@ class DiskController extends Controller
             return CustomCommon::makeErrRes('无法共享，您无权操作此文件夹');
         }
 
+        $id = $request->id;
+        $type = $request->type;
         $status = $request->status;
-        $fid = $request->fid;
 
-        if ($status == 1) {
+        if ($type === 'folder') {
             
-            FolderShared::find($fid)->delete();
-        } else {
+            if ($status === 1) {
 
-            FolderShared::updateOrInsert(
-                ['fid' => $fid],
-                ['ctime' => time()]
-            );
+                FolderShared::where('fid', $id)->delete();
+            } else {
+                
+                FolderShared::updateOrInsert(
+                    ['fid' => $id],
+                    ['ctime' => time()]
+                );
+            }
+        } else {
+            
+            if ($status === 1) {
+
+                FileShared::where('file_id', $id)->delete();
+            } else {
+                
+                FileShared::updateOrInsert(
+                    ['file_id' => $id],
+                    ['ctime' => time()]
+                );
+            }
         }
 
-        return CustomCommon::makeSuccRes([], '共享成功，此文件夹所有人可见');
+        return CustomCommon::makeSuccRes([], '分享成功');
     }
 }

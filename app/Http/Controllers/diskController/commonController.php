@@ -5,7 +5,9 @@ namespace App\Http\Controllers\diskController;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 
-class commonController extends Controller
+use App\Models\UploadFolder;
+
+class CommonController extends Controller
 {
     /**
      * 插入一条文件记录，
@@ -77,5 +79,44 @@ class commonController extends Controller
         }
 
         return $insertId;
+    }
+
+
+    /**
+     * 取出所有后代文件夹
+     * $folderIdArr 文件夹id数组
+     * 
+     * 返回3个数组，offspring只有后代，target第一层文件夹，all所有文件夹
+     * 每一个都是二维数组，形如：[ ['id' => 5, 'fid' => 1, 'name' => '文件夹'] ]
+     */
+    public static function getOffspringFolder ($folderIdArr) {
+
+        $folderData = [];  // 汇总数组，存放自身和所有后代的文件夹数据
+
+        // 递归循环取出所有后代
+        $currentIdList = $folderIdArr;  // 当前循环的fid列表
+        do {
+            
+            $arr = UploadFolder::select(['id', 'fid', 'name'])
+                ->whereIn('fid', $currentIdList)
+                ->get()
+                ->toArray();
+
+            $currentIdList = array_column($arr, 'id');
+            $folderData = array_merge($folderData, $arr);
+
+        } while (count($currentIdList) > 0);
+
+        // 取出自身数据
+        $arr = UploadFolder::select(['id', 'fid', 'name'])
+            ->whereIn('id', $folderIdArr)
+            ->get()
+            ->toArray();
+
+        return [
+            'offspring' => $folderData,
+            'target' => $arr,
+            'all' => array_merge($folderData, $arr),
+        ];
     }
 }

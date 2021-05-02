@@ -189,8 +189,9 @@ class CheckParams
 
         $validateData = $request->input();
         $res = Validator::make($validateData, [
-            'fid' => 'bail|required|numeric',
+            'id' => 'bail|required|numeric',
             'status' => 'bail|required|in:1,2',
+            'type' => 'bail|required|in:file,folder',
         ]);
 
         if ($res->fails() !== false) return $this->makeErrRes($res);
