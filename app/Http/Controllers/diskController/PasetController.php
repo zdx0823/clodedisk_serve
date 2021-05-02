@@ -355,11 +355,11 @@ class PasetController extends Controller
      * 创建文件夹，并修正文件夹之间的关系。默认为删除状态
      * $finalArr 顶层文件夹去重名后的数组
      * $distId 目的地文件夹id
-     * $uid,$uid_type 辨认用户身份
+     * $uid 辨认用户身份
      * 
      * 返回false，或 id匹配数组，键名为原文件夹id，键值为新文件夹id。该数组即文件的fidMap
      */
-    private static function storeFolder ($finalArr, $distId, $uid, $uid_type) {
+    private static function storeFolder ($finalArr, $distId, $uid) {
 
         $insertIds = [];
 
@@ -376,7 +376,6 @@ class PasetController extends Controller
                 $insertId = DB::table('upload_folder')->insertGetId([
                     'name' => $target['name'],
                     'uid' => $uid,
-                    'uid_type' => $uid_type,
                     'ctime' => $ctime,
                     'mtime' => $mtime,
                     'dtime' => $dtime,
@@ -423,9 +422,10 @@ class PasetController extends Controller
         );
 
         // 更新fid值
-        $ins = DB::table('upload_folder');
         foreach ($fidMap as $id => $fid) {
-            $ins->where('id', $id)->update(['fid' => $fid]);
+            DB::table('upload_folder')
+                ->where('id', $id)
+                ->update(['fid' => $fid]);
         }
 
         return $idMap;
@@ -435,7 +435,7 @@ class PasetController extends Controller
     /**
      * 复制文件夹，返回第一层和所有后代的id
      * $params
-     *      uid, uid_type 辨认用户身份
+     *      uid 辨认用户身份
      *      folderIdArr 顶层文件夹id数组
      *      distId  目的地文件夹id
      * 
@@ -445,7 +445,6 @@ class PasetController extends Controller
 
         [
             'uid' => $uid,
-            'uid_type' => $uid_type,
             'folderIdArr' => $folderIdArr,
             'distId' => $distId,
         ] = $params;
@@ -476,7 +475,7 @@ class PasetController extends Controller
         $finalArr = array_merge($sourceData['offspring'], $targetDataRes);
 
         // 创建文件夹
-        $idMap = self::storeFolder($finalArr, $distId, $uid, $uid_type);
+        $idMap = self::storeFolder($finalArr, $distId, $uid);
 
         // 执行失败，提前返回
         if ($idMap === false) return '复制失败，请重试';
@@ -588,7 +587,7 @@ class PasetController extends Controller
     /**
      * 复制后代文件
      * $params
-     *      uid, uid_type 辨认用户身份
+     *      uid 辨认用户身份
      *      allFid 所有的文件夹id，包括后代的
      *      distId 目的地文件夹id
      *      fidMap fid匹配数组
@@ -599,7 +598,6 @@ class PasetController extends Controller
 
         [
             'uid' => $uid,
-            'uid_type' => $uid_type,
             'allFid' => $allFid,
             'distId' => $distId,
             'fidMap' => $fidMap,
@@ -624,11 +622,10 @@ class PasetController extends Controller
      */
     public static function paset ($params) {
 
-        $uid = 1;
-        $uid_type = 3;
         [
             'idList' => $idList,
             'distId' => $distId,
+            'uid' => $uid,
         ] = $params;
 
         
@@ -655,7 +652,6 @@ class PasetController extends Controller
 
             $res = self::pasetFolder(compact(
                 'uid',
-                'uid_type',
                 'folderIdArr',
                 'distId',
             ));
@@ -700,7 +696,7 @@ class PasetController extends Controller
     /**
      * 剪切文件夹
      * $params
-     *      uid, uid_type 身份辨识
+     *      uid身份辨识
      *      folderIdArr 文件夹id数组
      *      distId  目的地文件夹id
      * 
@@ -710,7 +706,6 @@ class PasetController extends Controller
 
         [
             'uid' => $uid,
-            'uid_type' => $uid_type,
             'folderIdArr' => $folderIdArr,
             'distId' => $distId,
         ] = $params;
@@ -758,30 +753,12 @@ class PasetController extends Controller
 
 
     /**
-     * 
-     */
-    private static function pasetCutFile ($params) {
-
-        [
-            'uid' => $uid,
-            'uid_type' => $uid_type,
-            'fileIdArr' => $fileIdArr,
-            'distId' => $distId,
-        ] = $params;
-
-
-
-    }
-
-
-    /**
      * 剪切文件或文件夹
      */
     public static function pasetCut ($params) {
 
-        $uid = 1;
-        $uid_type = 3;
         [
+            'uid' => $uid,
             'idList' => $idList,
             'distId' => $distId,
         ] = $params;
@@ -810,7 +787,6 @@ class PasetController extends Controller
 
             $res = self::pasetCutFolder(compact(
                 'uid',
-                'uid_type',
                 'folderIdArr',
                 'distId',
             ));

@@ -10,7 +10,7 @@ use DB;
 class UploadFolderSeeder extends Seeder
 {
 
-    private static function buildUser ($userBaseId, $uid, $uid_type) {
+    private static function buildUser ($userBaseId, $uid) {
 
         $_name = "用户_" . ($uid - 1) . "的顶层目录";
         // 生成用户1的顶层目录取出id
@@ -18,7 +18,6 @@ class UploadFolderSeeder extends Seeder
             'fid' => $userBaseId,
             'name' => $_name,
             'uid' => $uid,
-            'uid_type' => $uid_type,
             UploadFolder::CREATED_AT => time(),
             UploadFolder::UPDATED_AT => time()
         ])->first()->id;
@@ -28,7 +27,6 @@ class UploadFolderSeeder extends Seeder
             ->times(10)
             ->create([
                 'uid' => $uid,
-                'uid_type' => $uid_type,
                 'fid' => $user_1,
             ]);
 
@@ -44,7 +42,6 @@ class UploadFolderSeeder extends Seeder
             ->state(new Sequence(...$user_ids))
             ->create([
                 'uid' => $uid,
-                'uid_type' => $uid_type,
                 UploadFolder::CREATED_AT => time(),
                 UploadFolder::UPDATED_AT => time()
             ]);

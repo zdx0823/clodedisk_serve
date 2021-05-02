@@ -44,7 +44,6 @@ class StoreFolderController extends Controller
         [
             'fid' => $fid,
             'uid' => $uid,
-            'uid_type' => $uid_type,
             'firstVal' => $firstVal,
             'lastVal' => $lastVal,
         ] = $params;
@@ -53,7 +52,6 @@ class StoreFolderController extends Controller
         $escapedFirstVal = CustomCommon::escapeSQL($firstVal);
         $distData = UploadFolder::select('name')
             ->where('uid', $uid)
-            ->where('uid_type', $uid_type)
             ->where('fid', $fid)
             ->whereRaw("name REGEXP '^$escapedFirstVal(\\\\([0-9]+\\\\)){0,1}$'")
             ->get()
@@ -102,7 +100,6 @@ class StoreFolderController extends Controller
         [
             'fid' => $fid,
             'uid' => $uid,
-            'uid_type' => $uid_type,
             'firstVal' => $firstVal,
         ] = $params;
 
@@ -110,7 +107,6 @@ class StoreFolderController extends Controller
         // 用firstVal查询数据库看有没有这一项，如果没有就可以用，有就不能用
         $isExist = UploadFolder::select('id')
             ->where('uid', $uid)
-            ->where('uid_type', $uid_type)
             ->where('fid', $fid)
             ->where('name', $firstVal)
             ->first();
@@ -122,7 +118,6 @@ class StoreFolderController extends Controller
         $lastVal = '(1)';
         $finalName = self::whenHasTwo(compact(
             'uid',
-            'uid_type',
             'fid',
             'firstVal',
             'lastVal',
@@ -137,7 +132,6 @@ class StoreFolderController extends Controller
         [
             'fid' => $fid,
             'uid' => $uid,
-            'uid_type' => $uid_type,
             'lastVal' => $lastVal,
         ] = $params;
 
@@ -147,7 +141,6 @@ class StoreFolderController extends Controller
         // 用lastVal查询数据库看有没有，如果有不能用，没有可以用
         $isExist = UploadFolder::select('id')
             ->where('uid', $uid)
-            ->where('uid_type', $uid_type)
             ->where('fid', $fid)
             ->where('name', $lastVal)
             ->first();
@@ -160,7 +153,6 @@ class StoreFolderController extends Controller
         $lastVal = '(1)';
         $finalName = self::whenHasTwo(compact(
             'uid',
-            'uid_type',
             'fid',
             'firstVal',
             'lastVal'
@@ -172,7 +164,7 @@ class StoreFolderController extends Controller
 
     /**
      * 生成一个文件夹名，规定同一父级下文件夹名不能重复，如果重复添加形如 (x) 的后缀
-     * @param array $params fid父级id，uid，uid_type确定用户身份，帮助检索，name，输入的文件名
+     * @param array $params fid父级id，uid 确定用户身份，帮助检索，name，输入的文件名
      * @return string $finalName 返回一个可用的文件夹名
      */
     protected static function buildFinalName ($params) {
@@ -180,7 +172,6 @@ class StoreFolderController extends Controller
         [
             'fid' => $fid,
             'uid' => $uid,
-            'uid_type' => $uid_type,
             'name' => $name,
         ] = $params;
 
@@ -196,7 +187,6 @@ class StoreFolderController extends Controller
         if ($firstVal != null && $lastVal != null) {
             $finalName = self::whenHasTwo(compact(
                 'uid',
-                'uid_type',
                 'fid',
                 'firstVal',
                 'lastVal',
@@ -207,7 +197,6 @@ class StoreFolderController extends Controller
         if ($firstVal != null && $lastVal == null) {
             $finalName = self::whenOnlyFirstVal(compact(
                 'uid',
-                'uid_type',
                 'fid',
                 'firstVal'
             ));
@@ -217,7 +206,6 @@ class StoreFolderController extends Controller
         if ($firstVal == null && $lastVal != null) {
             $finalName = self::whenOnlyLastVal(compact(
                 'uid',
-                'uid_type',
                 'fid',
                 'lastVal'
             ));
@@ -229,9 +217,8 @@ class StoreFolderController extends Controller
 
     public static function save ($params) {
         
-        $uid = 1;
-        $uid_type = 3;
         [
+            'uid' => $uid,
             'fid' => $fid,
             'folderName' => $name
         ] = $params;
@@ -240,7 +227,6 @@ class StoreFolderController extends Controller
         $finalName = self::buildFinalName(compact(
             'fid',
             'uid',
-            'uid_type',
             'name',
         ));
 
@@ -248,7 +234,6 @@ class StoreFolderController extends Controller
         $res = UploadFolder::create([
             'fid' => $fid,
             'uid' => $uid,
-            'uid_type' => $uid_type,
             'name' => $finalName,
         ]);
 

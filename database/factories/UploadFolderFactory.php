@@ -26,7 +26,6 @@ class UploadFolderFactory extends Factory
             'fid' => null,
             'name' => \Faker\Factory::create('zh_CN')->name,
             'uid' => 1,
-            'uid_type' => 3
         ];
     }
 }

@@ -12,6 +12,124 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
+
+/**
+ * 鉴定用户操作的数据是否属于它本人的
+ */
+class IsChangeable {
+
+    
+    public static function storeFolder ($request) {
+
+        $uid = UserInfo::id();
+        $fid = $request->fid;
+
+        $ins = UploadFolder::find($fid);
+
+        if ($ins == null) return false;
+        if ($ins->uid !== $uid) return false;
+
+        return true;
+    }
+
+
+    public static function updateFileName ($request) {
+
+        $fileId = $request->id;
+        $file = UploadFile::find($fileId);
+        $uid = UserInfo::id();
+
+        if ($file == null) return false;
+
+        $folder = UploadFolder::find($file->fid);
+        if ($folder == null) return false;
+        if ($folder->uid !== $uid) return false;
+
+        return true;
+    }
+
+
+    public static function updateFolderName ($request) {
+
+        $uid = UserInfo::id();
+        
+        $ins = UploadFolder::find($request->fid);
+
+        if ($ins == null) return false;
+        if ($ins->uid !== $uid) return false;
+
+        return true;
+    }
+
+
+    public static function copyResource ($request) {
+
+        $uid = UserInfo::id();
+
+        $ins = UploadFolder::find($request->distId);
+        if ($ins == null) return false;
+        if ($ins->uid !== $uid) return false;
+
+        return true;
+    }
+
+
+    public static function cutResource ($request) {
+        return self::copyResource($request);
+    }
+
+
+    public static function destroy ($fileIdArr, $folderIdArr) {
+
+        $uid = UserInfo::id();
+
+        if (count($fileIdArr) > 0) {
+
+            // 取出id列
+            $files = UploadFile::whereIn('id', $fileIdArr)->get()->toArray();
+            if (count($files) === 0) return false;
+
+            $fidList = array_column($files, 'fid');
+            $folders = UploadFolder::whereIn('id', $fidList)->get()->toArray();
+
+            if (count($folders) === 0) return false;
+
+            $uidList = array_column($folders, 'uid');
+            $uniqued = array_unique($uidList);
+
+            if (count($uniqued) > 1) return false;
+            if ($uniqued[0] !== $uid) return false;
+        }
+
+        if (count($folderIdArr) > 0) {
+
+            $folders = UploadFolder::whereIn('id', $folderIdArr)->get()->toArray();
+            if (count($folders) === 0) return false;
+
+            $uidList = array_column($folders, 'uid');
+            $uniqued = array_unique($uidList);
+
+            if (count($uniqued) > 0) return false;
+            if ($uniqued[0] !== $uid) return false;
+        }
+
+        return true;
+    }
+
+    
+    public static function upload ($request) {
+
+        $uid = UserInfo::id();
+        $ins = UploadFolder::find($request->fid);
+
+        if ($ins == null) return false;
+        if ($uid !== $ins->uid) return false;
+
+        return true;
+    }
+}
+
+
 class DiskController extends Controller
 {
 
@@ -125,7 +243,7 @@ class DiskController extends Controller
 
     /**
      * 根据fid查询该文件夹下的文件和文件夹
-     * $params uid, uid_type 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
+     * $params uid 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
      * 
      * 返回 data数据，tPath当前路径，crumb数组，面包屑
      */
@@ -251,7 +369,7 @@ class DiskController extends Controller
      * 根据路径查出对应文件夹下的文件和文件夹
      * 先查出路径对应的fid，再调用listByFid查询
      * 
-     * $params uid, uid_type 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
+     * $params uid 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
      * 
      * 返回 data数据，tPath当前路径，crumb数组，面包屑
      */
@@ -259,7 +377,6 @@ class DiskController extends Controller
         
         [
             'uid' => $uid,
-            'uid_type' => $uid_type,
             'path' => $path,
             'offset' => $offset,
             'limit' => $limit,
@@ -290,8 +407,7 @@ class DiskController extends Controller
     // 文件，文件夹列表
     public function list (Request $request) {
 
-        $uid = 1;
-        $uid_type = 3;
+        $uid = UserInfo::id();
 
         $fid = $request->input('fid', null);
         $path = $request->input('path', null);
@@ -303,7 +419,7 @@ class DiskController extends Controller
         $limit = $pagesize;
 
         // 合并成数组
-        $params = compact('uid', 'uid_type', 'offset', 'limit', 'order');
+        $params = compact('uid', 'offset', 'limit', 'order');
 
         // 添加fid值或path值
         // 如果两者都存在 或者 只存在path 使用listByPath
@@ -347,8 +463,10 @@ class DiskController extends Controller
      */
     public function storeFolder (Request $request) {
         
-        $uid = 1;
-        $uid_type = 3;
+        $res = IsChangeable::storeFolder($request);
+        if (!$res) return CustomCommon::makeErrRes('所在文件夹不存在或已被删除，请重试');
+
+        $uid = UserInfo::id();
         [
             'fid' => $fid,
             'folderName' => $folderName
@@ -356,8 +474,6 @@ class DiskController extends Controller
         
         // 判断父级文件夹是否存在
         $isFidExist = UploadFolder::select('id')
-            ->where('uid', $uid)
-            ->where('uid_type', $uid_type)
             ->where('id', $fid)
             ->first();
 
@@ -367,6 +483,7 @@ class DiskController extends Controller
 
         // 插入
         $insertId = diskController\StoreFolderController::save(compact(
+            'uid',
             'fid',
             'folderName',
         ));
@@ -444,6 +561,8 @@ class DiskController extends Controller
 
     // 上传文件
     public function upload (Request $request) {
+
+        if (!IsChangeable::upload($request)) return CustomCommon::makeErrRes('上传失败，您无权操作此文件夹');
 
         [
             'qqpartindex' => $qqpartindex,
@@ -528,8 +647,8 @@ class DiskController extends Controller
      */
     public function updateFileName (Request $request) {
 
-        $uid = 1;
-        $uid_type = 3;
+        if (!IsChangeable::updateFileName($request))  return CustomCommon::makeErrRes('修改失败，文件不存在或已被删除'); 
+
         [
             'id' => $id,
             'fid' => $fid,
@@ -574,8 +693,9 @@ class DiskController extends Controller
      */
     public function updateFolderName (Request $request) {
         
-        $uid = 1;
-        $uid_type = 3;
+        if (!IsChangeable::updateFolderName($request)) return CustomCommon::makeErrRes('修改失败，文件夹不存在或已被删除');
+
+        $uid = UserInfo::id();
         [
             'id' => $id,
             'fid' => $fid,
@@ -612,8 +732,15 @@ class DiskController extends Controller
      * 复制文件或文件夹
      */
     public function copyResource (Request $request) {
+        
+        if (!IsChangeable::copyResource($request)) return CustomCommon::makeErrRes('复制失败，您无权操作此文件夹');
 
-        $res = diskController\PasetController::paset($request->input());
+        $params = [
+            'idList' => $request->idList,
+            'distId' => $request->distId,
+            'uid' => UserInfo::id(),    
+        ];
+        $res = diskController\PasetController::paset($params);
         
         if ($res === true) {
             return CustomCommon::makeSuccRes([], '复制成功');
@@ -629,7 +756,14 @@ class DiskController extends Controller
      */
     public function cutResource (Request $request) {
 
-        $res = diskController\PasetController::pasetCut($request->input());
+        if (!IsChangeable::cutResource($request)) return CustomCommon::makeErrRes('移动失败，您无权操作此文件夹');
+
+        $params = [
+            'uid' => UserInfo::id(),
+            'idList' => $request->idList,
+            'distId' => $request->distId,
+        ];
+        $res = diskController\PasetController::pasetCut($params);
         
         if ($res === true) {
             return CustomCommon::makeSuccRes([], '移动成功');
@@ -661,6 +795,7 @@ class DiskController extends Controller
             }
         }
 
+        if (!IsChangeable::destroy($fileIdArr, $folderIdArr)) return CustomCommon::makeErrRes('删除失败，您无权操作此文件夹');
 
         // 如果有文件夹
         if (count($folderIdArr) > 0) {
