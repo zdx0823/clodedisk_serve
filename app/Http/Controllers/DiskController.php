@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+
 use App\Models\UploadFolder;
 use App\Models\UploadFile;
+use App\Models\FolderShared;
+
 use App\Custom\Common\CustomCommon;
 use App\Custom\UserInfo\UserInfo;
-use Illuminate\Support\Facades\Storage;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
+
+use App\Http\Controllers\Controller;
 
 /**
  * 鉴定用户操作的数据是否属于它本人的
@@ -109,7 +113,7 @@ class IsChangeable {
             $uidList = array_column($folders, 'uid');
             $uniqued = array_unique($uidList);
 
-            if (count($uniqued) > 0) return false;
+            if (count($uniqued) > 1) return false;
             if ($uniqued[0] !== $uid) return false;
         }
 
@@ -118,6 +122,19 @@ class IsChangeable {
 
     
     public static function upload ($request) {
+
+        $uid = UserInfo::id();
+        $ins = UploadFolder::find($request->fid);
+
+        if ($ins == null) return false;
+        if ($uid !== $ins->uid) return false;
+
+        return true;
+    }
+
+
+    public static function updateFolderShared ($request) {
+
 
         $uid = UserInfo::id();
         $ins = UploadFolder::find($request->fid);
@@ -901,13 +918,31 @@ class DiskController extends Controller
     }
 
 
-    // 设置文件夹共享状态
+    /**
+     * 设置文件夹共享状态
+     * 期望接收2个值，要共享的文件夹id，和状态值
+     * status: 1 不共享， 2共享
+     */
     public function updateFolderShared (Request $request) {
+
+        if (!IsChangeable::updateFolderShared($request)) {
+            return CustomCommon::makeErrRes('无法共享，您无权操作此文件夹');
+        }
 
         $status = $request->status;
         $fid = $request->fid;
 
+        if ($status == 1) {
+            
+            FolderShared::find($fid)->delete();
+        } else {
 
+            FolderShared::updateOrInsert(
+                ['fid' => $fid],
+                ['ctime' => time()]
+            );
+        }
 
+        return CustomCommon::makeSuccRes([], '共享成功，此文件夹所有人可见');
     }
 }

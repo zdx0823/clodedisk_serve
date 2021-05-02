@@ -17,8 +17,6 @@ class CreateFolderSharedsTable extends Migration
             $table->id();
             $table->integer('fid')->unsigned();
             $table->bigInteger('ctime');
-            $table->bigInteger('mtime');
-            $table->bigInteger('dtime');
         });
 
         Schema::table('folder_shareds', function (Blueprint $table) {
