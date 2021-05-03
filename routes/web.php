@@ -34,7 +34,7 @@ Route::prefix('/api/clodedisk')
   Route::get('/shared/update', 'SharedController@update')->name('updateFolderShared');
 
   // 获取列表
-  Route::get('/shared/list', 'SharedController@listShared')->name('listShared');
+  Route::get('/shared/list', 'SharedController@list')->name('listShared');
 
   // 访问某个共享文件夹
   Route::get('/shared/item/{fid}', 'SharedController@item')->name('itemShared');

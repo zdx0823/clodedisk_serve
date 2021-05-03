@@ -186,4 +186,74 @@ class SharedController extends Controller
             'order'
         ));
     }
+
+
+    /**
+     * 获取共享文件夹列表
+     */
+    public function list (Request $request) {
+
+        $page = $request->input('page', 1);
+        $pagesize = $request->input('pagesize', 10);
+        $order = $request->input('order', 'desc');
+
+        $offset = ($page - 1) * $pagesize;
+        $limit = $pagesize;
+
+        // 拿出10个文件夹
+        $fShareds = FolderShared::orderBy('ctime', $order)
+            ->limit($limit)
+            ->offset($offset)
+            ->get()
+            ->toArray();
+
+        $fidList = array_column($fShareds, 'fid');
+        $folders = [];
+
+        if (count($fidList) > 0) {
+            
+            $folders = UploadFolder::select(['id', 'fid', 'name', 'ctime'])
+                ->whereIn('id', $fidList)
+                ->orderBy('ctime', $order)
+                ->limit($limit)
+                ->offset($offset)
+                ->get()
+                ->toArray();
+        }
+            
+        // 拿出10个文件
+        $ffShared = FileShared::orderBy('ctime', $order)
+            ->limit($limit)
+            ->offset($offset)
+            ->get()
+            ->toArray();
+        $fileIdList = array_column($ffShared, 'file_id');
+        $files = [];
+
+        if (count($fileIdList) > 0) {
+            
+            $files = UploadFile::select(['id', 'name', 'alias', 'fid', 'ctime'])
+                ->with('extend_info')
+                ->where('id', $fileIdList)
+                ->orderBy('ctime', $order)
+                ->limit($limit)
+                ->offset($offset)
+                ->get()
+                ->toArray();
+        }
+
+        // 合并拼成一个数组，取出对应数量的数据，先文件夹，后文件
+        $data = [];
+        for ($i = 0; $i < $limit; $i++) {
+            if (count($folders) > 0) {
+                $data[$i] = array_shift($folders);
+            } else if (count($files) > 0) {
+                $data[$i] = array_shift($files);
+            } else {
+                break;
+            }
+        }
+
+        return $data;
+    }
 }
