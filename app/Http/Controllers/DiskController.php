@@ -298,66 +298,9 @@ class DiskController extends Controller
 
 
     /**
-     * 根据fid获取数据
-     */
-    protected static function listByFidData ($params) {
-
-        [
-            'fid' => $fid,
-            'offset' => $offset,
-            'limit' => $limit,
-            'order' => $order
-        ] = $params;
-        
-
-        // 检查id = fid 的文件夹存不存在
-        $isFidExist = UploadFolder::select(['id'])
-            ->where('id', $fid)
-            ->first();
-        if ($isFidExist == null) {
-            return false;
-        }
-
-
-        // 拿出10个文件夹
-        $folders = UploadFolder::select(['id', 'fid', 'name', 'ctime'])
-            ->where('fid', $fid)
-            ->orderBy('ctime', $order)
-            ->limit($limit)
-            ->offset($offset)
-            ->get()
-            ->toArray();
-            
-        // 拿出10个文件
-        $files = UploadFile::select(['id', 'name', 'alias', 'fid', 'ctime'])
-            ->with('extend_info')
-            ->where('fid', $fid)
-            ->orderBy('ctime', $order)
-            ->limit($limit)
-            ->offset($offset)
-            ->get()
-            ->toArray();
-
-        // 合并拼成一个数组，取出对应数量的数据，先文件夹，后文件
-        $data = [];
-        for ($i = 0; $i < $limit; $i++) {
-            if (count($folders) > 0) {
-                $data[$i] = array_shift($folders);
-            } else if (count($files) > 0) {
-                $data[$i] = array_shift($files);
-            } else {
-                break;
-            }
-        }
-
-        return $data;
-    }
-
-
-    /**
      * 根据fid查询该文件夹下的文件和文件夹
      * $params uid 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
-     * 1. 调用self::listByFidData
+     * 1. 调用DISKCommon::listByFidData
      * 2. 生成面包屑
      * 
      * 返回 data数据，tPath当前路径，crumb数组，面包屑
@@ -368,7 +311,7 @@ class DiskController extends Controller
             'fid' => $fid
         ] = $params;
 
-        $data = self::listByFidData($params);
+        $data = DISKCommon::listByFidData($params);
 
         // 生成面包屑
         $crumbData = $this->buildCrumb($fid);
@@ -971,118 +914,5 @@ class DiskController extends Controller
         $quality = $imageQuality[$mime];
         header("Content-Type: $mime");
         $content = call_user_func_array($imageFnName, [$dim, NULL, $quality]);
-    }
-
-
-    /**
-     * 设置文件夹共享状态
-     * 期望接收2个值，要共享的文件夹id，和状态值
-     * status: 1 不共享， 2共享
-     */
-    public function updateFolderShared (Request $request) {
-
-        if (!IsChangeable::updateFolderShared($request)) {
-            return CustomCommon::makeErrRes('无法共享，您无权操作此文件夹');
-        }
-
-        $id = $request->id;
-        $type = $request->type;
-        $status = $request->status;
-
-        if ($type === 'folder') {
-            
-            if ($status === 1) {
-
-                FolderShared::where('fid', $id)->delete();
-            } else {
-                
-                FolderShared::updateOrInsert(
-                    ['fid' => $id],
-                    ['ctime' => time()]
-                );
-            }
-        } else {
-            
-            if ($status === 1) {
-
-                FileShared::where('file_id', $id)->delete();
-            } else {
-                
-                FileShared::updateOrInsert(
-                    ['file_id' => $id],
-                    ['ctime' => time()]
-                );
-            }
-        }
-
-        return CustomCommon::makeSuccRes([], '分享成功');
-    }
-
-
-    /**
-     * 向上判断祖先文件夹是否有被共享
-     * 
-     * 返回布尔值
-     */
-    private static function isFidShared ($fid) {
-
-        // 向上寻找祖先文件夹
-        // 1. 找该用户的基本id
-        $uid = UserInfo::id();
-        $baseId = UploadFolder::where('uid', $uid)
-            ->where('fid', self::allBaseId())
-            ->first()
-            ->id;
-
-        $res = false;
-        $curFid = $fid;
-        do {
-
-            $sharedIns = FolderShared::where('fid', $curFid)->first();
-
-            if ($sharedIns !== null) {
-                $res = true;
-                break;
-            }
-
-            $folder = UploadFolder::where('id', $curFid)->first();
-            if ($folder == null) break;
-            $curFid = $folder->fid;
-
-        } while ($curFid !== $baseId);
-
-        return $res;
-    }
-
-
-    /**
-     * 获取共享文件夹里的数据
-     */
-    public function itemShared (Request $request) {
-
-        $fid = $request->fid;
-
-        $page = $request->input('page', 1);
-        $pagesize = $request->input('pagesize', 10);
-        $order = $request->input('order', 'desc');
-
-        $offset = ($page - 1) * $pagesize;
-        $limit = $pagesize;
-
-        // 即不是文件夹主人，文件夹又没有被共享，无法查看
-        if (
-            !IsChangeable::itemShared($request) &&
-            !self::isFidShared($fid)
-        ) {
-
-            return CustomCommon::makeErrRes('您无权查看此文件夹');
-        }
-
-        return self::listByFidData(compact(
-            'fid',
-            'offset',
-            'limit',
-            'order'
-        ));
     }
 }

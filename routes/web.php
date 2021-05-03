@@ -31,13 +31,13 @@ Route::prefix('/api/clodedisk')
   Route::get('/img/{img}', 'DiskController@img')->name('img');
 
   // 设置文件夹成共享
-  Route::get('/shared/update', 'DiskController@updateFolderShared')->name('updateFolderShared');
+  Route::get('/shared/update', 'SharedController@update')->name('updateFolderShared');
 
   // 获取列表
-  Route::get('/shared/list', 'DiskController@listShared')->name('listShared');
+  Route::get('/shared/list', 'SharedController@listShared')->name('listShared');
 
   // 访问某个共享文件夹
-  Route::get('/shared/item/{fid}', 'DiskController@itemShared')->name('itemShared');
+  Route::get('/shared/item/{fid}', 'SharedController@item')->name('itemShared');
 });
 
 
