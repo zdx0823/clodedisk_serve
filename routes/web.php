@@ -41,6 +41,14 @@ Route::prefix('/api/clodedisk')
 });
 
 
+
+Route::prefix('/api/resources')->middleware(['authApi', 'checkParams'])->group(function () {
+
+  Route::get('/slide', 'ResourcesController@slide')->name('resourcesSlide');
+
+});
+
+
 // 静态页面
 Route::get('/', 'StaticPageController@index')->name('indexPage');
 
