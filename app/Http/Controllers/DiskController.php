@@ -157,6 +157,18 @@ class IsChangeable {
 
         return true;
     }
+
+
+    public static function itemShared ($request) {
+
+        $uid = UserInfo::id();
+        $ins = UploadFolder::find($request->fid);
+
+        if ($ins == null) return false;
+        if ($uid !== $ins->uid) return false;
+
+        return true;
+    }
 }
 
 
@@ -199,6 +211,19 @@ class DiskController extends Controller
 
 
     /**
+     * 获取所有用户共有的顶层id
+     * 管理员目录的顶层目录fid是null
+     * 其他用户的顶层目录fid是2
+     */
+    private static function allBaseId () {
+
+        if (UserInfo::type() === 'admin') return null;
+
+        return 2;
+    }
+
+
+    /**
      * 生成面包屑
      * @param fid
      * @return array 二维数组，第一项是最外层文件夹
@@ -209,6 +234,7 @@ class DiskController extends Controller
 
         $curFid = $fid;
         $data = [];
+        $baseId = self::allBaseId();
 
         $pathList = [];
         // 向上遍历直到用户的顶层文件夹
@@ -222,7 +248,7 @@ class DiskController extends Controller
             $curFid = $crumbOne['fid'];
             array_unshift($data, $crumbOne);
 
-        } while ($curFid !== NULL);
+        } while ($curFid !== $baseId);
 
         // 修改第一项的值
         $data[0]['fid'] = 0;
@@ -272,12 +298,9 @@ class DiskController extends Controller
 
 
     /**
-     * 根据fid查询该文件夹下的文件和文件夹
-     * $params uid 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
-     * 
-     * 返回 data数据，tPath当前路径，crumb数组，面包屑
+     * 根据fid获取数据
      */
-    protected function listByFid ($params) {
+    protected static function listByFidData ($params) {
 
         [
             'fid' => $fid,
@@ -326,6 +349,26 @@ class DiskController extends Controller
                 break;
             }
         }
+
+        return $data;
+    }
+
+
+    /**
+     * 根据fid查询该文件夹下的文件和文件夹
+     * $params uid 用户确定用户和它的身份，limit,offset分页，fid要获取的文件夹id，order排序方法
+     * 1. 调用self::listByFidData
+     * 2. 生成面包屑
+     * 
+     * 返回 data数据，tPath当前路径，crumb数组，面包屑
+     */
+    protected function listByFid ($params) {
+
+        [
+            'fid' => $fid
+        ] = $params;
+
+        $data = self::listByFidData($params);
 
         // 生成面包屑
         $crumbData = $this->buildCrumb($fid);
@@ -415,10 +458,10 @@ class DiskController extends Controller
 
         // 获取用户顶层目录id
         $baseId = UploadFolder::select(['id'])
-            ->where('fid', null)
+            ->where('fid', '=', self::allBaseId())  // bug
             ->where('uid', $uid)
             ->first()
-            ->value('id');
+            ->id;
 
         $fid = $this->retrieveFidByPath($baseId, $path);
 
@@ -973,5 +1016,73 @@ class DiskController extends Controller
         }
 
         return CustomCommon::makeSuccRes([], '分享成功');
+    }
+
+
+    /**
+     * 向上判断祖先文件夹是否有被共享
+     * 
+     * 返回布尔值
+     */
+    private static function isFidShared ($fid) {
+
+        // 向上寻找祖先文件夹
+        // 1. 找该用户的基本id
+        $uid = UserInfo::id();
+        $baseId = UploadFolder::where('uid', $uid)
+            ->where('fid', self::allBaseId())
+            ->first()
+            ->id;
+
+        $res = false;
+        $curFid = $fid;
+        do {
+
+            $sharedIns = FolderShared::where('fid', $curFid)->first();
+
+            if ($sharedIns !== null) {
+                $res = true;
+                break;
+            }
+
+            $folder = UploadFolder::where('id', $curFid)->first();
+            if ($folder == null) break;
+            $curFid = $folder->fid;
+
+        } while ($curFid !== $baseId);
+
+        return $res;
+    }
+
+
+    /**
+     * 获取共享文件夹里的数据
+     */
+    public function itemShared (Request $request) {
+
+        $fid = $request->fid;
+
+        $page = $request->input('page', 1);
+        $pagesize = $request->input('pagesize', 10);
+        $order = $request->input('order', 'desc');
+
+        $offset = ($page - 1) * $pagesize;
+        $limit = $pagesize;
+
+        // 即不是文件夹主人，文件夹又没有被共享，无法查看
+        if (
+            !IsChangeable::itemShared($request) &&
+            !self::isFidShared($fid)
+        ) {
+
+            return CustomCommon::makeErrRes('您无权查看此文件夹');
+        }
+
+        return self::listByFidData(compact(
+            'fid',
+            'offset',
+            'limit',
+            'order'
+        ));
     }
 }

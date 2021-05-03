@@ -199,6 +199,26 @@ class CheckParams
         return true;
     }
 
+
+    public function itemShared ($request) {
+
+        $validateData = $request->input();
+        $validateData['fid'] = $request->fid;
+
+        $res = Validator::make($validateData, [
+            'fid' => 'bail|required|numeric',
+            'page' => 'bail|numeric|min:1',
+            'pagesize' => 'bail|numeric|min:10',
+            'order' => [
+                Rule::in(['asc', 'desc', 'ASC', 'DESC'])
+            ]
+        ]);
+
+        if ($res->fails() !== false) return $this->makeErrRes($res);
+
+        return true;
+    }
+
     
     /**
      * 检索出路由名，路由名即此类的方法名，如果返回非true值就是参数错误

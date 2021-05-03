@@ -64,7 +64,7 @@ class AuthApi {
      */
     private static function isAdmin ($userInfo) {
 
-        if (!$userInfo['isAdmin']) return false;
+        if ($userInfo['type'] !== 'admin') return false;
 
         if (CheckLoggedToken::hasToken()) return true;
         

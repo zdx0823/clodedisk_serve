@@ -21,4 +21,13 @@ class UserInfo
         return $data['id'];
     }
 
+
+    public static function type () {
+        
+        self::init();
+        $sid = config('custom.session.user_info');
+        $data = session()->get($sid);
+
+        return $data['type'];
+    }
 }
